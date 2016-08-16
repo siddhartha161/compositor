@@ -7,8 +7,8 @@
 
 #include "mojo/public/cpp/bindings/formatting.h"
 #include "mojo/services/geometry/cpp/formatting.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
+#include "apps/compositor/services/interfaces/compositor.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
 
 namespace mojo {
 namespace gfx {

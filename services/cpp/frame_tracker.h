@@ -5,7 +5,7 @@
 #ifndef MOJO_SERVICES_GFX_COMPOSITION_CPP_SCHEDULING_H_
 #define MOJO_SERVICES_GFX_COMPOSITION_CPP_SCHEDULING_H_
 
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
 
 namespace mojo {
 namespace gfx {

@@ -6,7 +6,7 @@
 module mojo.gfx.composition;
 
 import "mojo/services/geometry/interfaces/geometry.mojom";
-import "mojo/services/gfx/composition/interfaces/scene_token.mojom";
+import "apps/compositor/services/interfaces/scene_token.mojom";
 
 // Determines how a node behaves during hit testing.
 //
