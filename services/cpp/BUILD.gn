@@ -12,6 +12,7 @@ source_set("cpp") {
 
   public_deps = [
     "../interfaces",
+    "//lib/ftl",
     "//mojo/services/geometry/cpp",
   ]
 }

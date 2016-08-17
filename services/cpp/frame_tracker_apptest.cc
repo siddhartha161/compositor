@@ -31,7 +31,7 @@ class FrameTrackerTest : public mojo::test::ApplicationTestBase {
   }
 
  private:
-  MOJO_DISALLOW_COPY_AND_ASSIGN(FrameTrackerTest);
+  FTL_DISALLOW_COPY_AND_ASSIGN(FrameTrackerTest);
 };
 
 namespace {

@@ -6,6 +6,7 @@
 #define MOJO_SERVICES_GFX_COMPOSITION_CPP_SCHEDULING_H_
 
 #include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "lib/ftl/macros.h"
 
 namespace mojo {
 namespace gfx {
@@ -50,7 +51,7 @@ class FrameTracker {
   mojo::gfx::composition::FrameInfo frame_info_;
   MojoTimeTicks frame_time_delta_ = 0;
 
-  MOJO_DISALLOW_COPY_AND_ASSIGN(FrameTracker);
+  FTL_DISALLOW_COPY_AND_ASSIGN(FrameTracker);
 };
 
 }  // namespace composition
