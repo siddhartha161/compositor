@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/backend/gpu_rasterizer.h"
+#include "apps/compositor/src/backend/gpu_rasterizer.h"
 
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
@@ -14,13 +14,12 @@
 #include <MGL/mgl_echo.h>
 #include <MGL/mgl_onscreen.h>
 
-#include "base/bind.h"
-#include "base/location.h"
-#include "base/logging.h"
-#include "base/message_loop/message_loop.h"
-#include "base/time/time.h"
-#include "base/trace_event/trace_event.h"
-#include "services/gfx/compositor/render/render_frame.h"
+#include "apps/compositor/glue/base/logging.h"
+#include "apps/compositor/glue/base/trace_event.h"
+#include "apps/compositor/src/render/render_frame.h"
+#include "lib/ftl/functional/make_runnable.h"
+#include "lib/ftl/logging.h"
+#include "lib/mtl/tasks/message_loop.h"
 
 namespace compositor {
 namespace {
@@ -37,14 +36,12 @@ GpuRasterizer::GpuRasterizer(mojo::ContextProviderPtr context_provider,
     : context_provider_(context_provider.Pass()),
       callbacks_(callbacks),
       viewport_parameter_listener_binding_(this),
-      viewport_parameter_timeout_(false, false),
       weak_ptr_factory_(this) {
-  DCHECK(context_provider_);
-  DCHECK(callbacks_);
+  FTL_DCHECK(context_provider_);
+  FTL_DCHECK(callbacks_);
 
   context_provider_.set_connection_error_handler(
-      base::Bind(&GpuRasterizer::OnContextProviderConnectionError,
-                 base::Unretained(this)));
+      [this] { OnContextProviderConnectionError(); });
   CreateContext();
 }
 
@@ -53,7 +50,7 @@ GpuRasterizer::~GpuRasterizer() {
 }
 
 void GpuRasterizer::CreateContext() {
-  DCHECK(!gl_context_);
+  FTL_DCHECK(!gl_context_);
 
   have_viewport_parameters_ = false;
 
@@ -61,36 +58,37 @@ void GpuRasterizer::CreateContext() {
   viewport_parameter_listener_binding_.Bind(
       GetProxy(&viewport_parameter_listener));
   context_provider_->Create(
-      viewport_parameter_listener.Pass(),
-      base::Bind(&GpuRasterizer::InitContext, base::Unretained(this)));
+      std::move(viewport_parameter_listener),
+      [this](mojo::InterfaceHandle<mojo::CommandBuffer> command_buffer) {
+        InitContext(std::move(command_buffer));
+      });
 }
 
 void GpuRasterizer::InitContext(
     mojo::InterfaceHandle<mojo::CommandBuffer> command_buffer) {
-  DCHECK(!gl_context_);
-  DCHECK(!ganesh_context_);
-  DCHECK(!ganesh_surface_);
+  FTL_DCHECK(!gl_context_);
+  FTL_DCHECK(!ganesh_context_);
+  FTL_DCHECK(!ganesh_surface_);
 
   if (!command_buffer) {
-    LOG(ERROR) << "Could not create GL context.";
+    FTL_LOG(ERROR) << "Could not create GL context.";
     callbacks_->OnRasterizerError();
     return;
   }
 
   gl_context_ = mojo::GLContext::CreateFromCommandBuffer(
       mojo::CommandBufferPtr::Create(std::move(command_buffer)));
-  DCHECK(!gl_context_->is_lost());
+  FTL_DCHECK(!gl_context_->is_lost());
   gl_context_->AddObserver(this);
-  ganesh_context_ = new mojo::skia::GaneshContext(gl_context_);
+  ganesh_context_ = ftl::MakeRefCounted<mojo::skia::GaneshContext>(gl_context_);
 
   if (have_viewport_parameters_) {
     ApplyViewportParameters();
   } else {
     viewport_parameter_timeout_.Start(
-        FROM_HERE,
-        base::TimeDelta::FromMilliseconds(kViewportParameterTimeoutMs),
-        base::Bind(&GpuRasterizer::OnViewportParameterTimeout,
-                   base::Unretained(this)));
+        mtl::MessageLoop::GetCurrent()->task_runner(),
+        [this] { OnViewportParameterTimeout(); },
+        ftl::TimeDelta::FromMilliseconds(kViewportParameterTimeoutMs));
   }
 }
 
@@ -122,34 +120,36 @@ void GpuRasterizer::DestroyContext() {
 }
 
 void GpuRasterizer::OnContextProviderConnectionError() {
-  LOG(ERROR) << "Context provider connection lost.";
+  FTL_LOG(ERROR) << "Context provider connection lost.";
 
   callbacks_->OnRasterizerError();
 }
 
 void GpuRasterizer::OnContextLost() {
-  LOG(WARNING) << "GL context lost!";
+  FTL_LOG(WARNING) << "GL context lost!";
 
   AbandonContext();
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE, base::Bind(&GpuRasterizer::RecreateContextAfterLoss,
-                            weak_ptr_factory_.GetWeakPtr()));
+  mtl::MessageLoop::GetCurrent()->task_runner()->PostTask(
+      [weak_ptr = weak_ptr_factory_.GetWeakPtr()] {
+        if (weak_ptr)
+          weak_ptr->RecreateContextAfterLoss();
+      });
 }
 
 void GpuRasterizer::RecreateContextAfterLoss() {
-  LOG(WARNING) << "Recreating GL context.";
+  FTL_LOG(WARNING) << "Recreating GL context.";
 
   DestroyContext();
   CreateContext();
 }
 
 void GpuRasterizer::OnViewportParameterTimeout() {
-  DCHECK(!have_viewport_parameters_);
+  FTL_DCHECK(!have_viewport_parameters_);
 
-  LOG(WARNING) << "Viewport parameter listener timeout after "
-               << kViewportParameterTimeoutMs << " ms: assuming "
-               << kDefaultVsyncIntervalUs
-               << " us vsync interval, rendering will be janky!";
+  FTL_LOG(WARNING) << "Viewport parameter listener timeout after "
+                   << kViewportParameterTimeoutMs << " ms: assuming "
+                   << kDefaultVsyncIntervalUs
+                   << " us vsync interval, rendering will be janky!";
 
   OnVSyncParametersUpdated(0, kDefaultVsyncIntervalUs);
 }
@@ -169,7 +169,7 @@ void GpuRasterizer::OnVSyncParametersUpdated(int64_t timebase,
 }
 
 void GpuRasterizer::ApplyViewportParameters() {
-  DCHECK(have_viewport_parameters_);
+  FTL_DCHECK(have_viewport_parameters_);
 
   if (gl_context_ && !gl_context_->is_lost()) {
     ready_ = true;
@@ -177,12 +177,12 @@ void GpuRasterizer::ApplyViewportParameters() {
   }
 }
 
-void GpuRasterizer::DrawFrame(const scoped_refptr<RenderFrame>& frame) {
-  DCHECK(frame);
-  DCHECK(ready_);
-  DCHECK(gl_context_);
-  DCHECK(!gl_context_->is_lost());
-  DCHECK(ganesh_context_);
+void GpuRasterizer::DrawFrame(const ftl::RefPtr<RenderFrame>& frame) {
+  FTL_DCHECK(frame);
+  FTL_DCHECK(ready_);
+  FTL_DCHECK(gl_context_);
+  FTL_DCHECK(!gl_context_->is_lost());
+  FTL_DCHECK(ganesh_context_);
 
   uint32_t frame_number = total_frames_++;
   frames_in_progress_++;
@@ -225,7 +225,7 @@ void GpuRasterizer::DrawFrame(const scoped_refptr<RenderFrame>& frame) {
 }
 
 void GpuRasterizer::DrawFinished(bool presented) {
-  DCHECK(frames_in_progress_);
+  FTL_DCHECK(frames_in_progress_);
 
   uint32_t frame_number = total_frames_ - frames_in_progress_;
   frames_in_progress_--;

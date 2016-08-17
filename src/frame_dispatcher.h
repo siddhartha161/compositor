@@ -5,16 +5,15 @@
 #ifndef SERVICES_GFX_COMPOSITOR_FRAME_DISPATCHER_H_
 #define SERVICES_GFX_COMPOSITOR_FRAME_DISPATCHER_H_
 
+#include <functional>
 #include <vector>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "lib/ftl/macros.h"
 
 namespace compositor {
 
-using FrameCallback =
-    base::Callback<void(mojo::gfx::composition::FrameInfoPtr)>;
+using FrameCallback = std::function<void(mojo::gfx::composition::FrameInfoPtr)>;
 
 // Maintains a list of pending frame callbacks to be dispatched.
 class FrameDispatcher {
@@ -31,7 +30,7 @@ class FrameDispatcher {
  private:
   std::vector<FrameCallback> pending_callbacks_;
 
-  DISALLOW_COPY_AND_ASSIGN(FrameDispatcher);
+  FTL_DISALLOW_COPY_AND_ASSIGN(FrameDispatcher);
 };
 
 }  // namespace compositor

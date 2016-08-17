@@ -5,8 +5,8 @@
 #ifndef SERVICES_GFX_COMPOSITOR_BACKEND_OUTPUT_H_
 #define SERVICES_GFX_COMPOSITOR_BACKEND_OUTPUT_H_
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 namespace compositor {
 
@@ -28,10 +28,10 @@ class Output {
   virtual Scheduler* GetScheduler() = 0;
 
   // Submits a frame to be rendered to the display, or null if none.
-  virtual void SubmitFrame(const scoped_refptr<RenderFrame>& frame) = 0;
+  virtual void SubmitFrame(const ftl::RefPtr<RenderFrame>& frame) = 0;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(Output);
+  FTL_DISALLOW_COPY_AND_ASSIGN(Output);
 };
 
 }  // namespace compositor

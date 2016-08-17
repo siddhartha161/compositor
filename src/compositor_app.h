@@ -7,12 +7,11 @@
 
 #include <memory>
 
-#include "base/macros.h"
-#include "mojo/common/tracing_impl.h"
+#include "apps/compositor/services/interfaces/compositor.mojom.h"
+#include "apps/compositor/src/compositor_engine.h"
+#include "lib/ftl/macros.h"
 #include "mojo/public/cpp/application/application_impl_base.h"
 #include "mojo/public/cpp/bindings/strong_binding_set.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom.h"
-#include "services/gfx/compositor/compositor_engine.h"
 
 namespace compositor {
 
@@ -28,13 +27,11 @@ class CompositorApp : public mojo::ApplicationImplBase {
   bool OnAcceptConnection(
       mojo::ServiceProviderImpl* service_provider_impl) override;
 
-  mojo::TracingImpl tracing_;
-
   mojo::StrongBindingSet<mojo::gfx::composition::Compositor>
       compositor_bindings_;
   std::unique_ptr<CompositorEngine> engine_;
 
-  DISALLOW_COPY_AND_ASSIGN(CompositorApp);
+  FTL_DISALLOW_COPY_AND_ASSIGN(CompositorApp);
 };
 
 }  // namespace compositor

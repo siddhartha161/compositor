@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/compositor_impl.h"
+#include "apps/compositor/src/compositor_impl.h"
 
 #include <utility>
 
-#include "services/gfx/compositor/scene_impl.h"
+#include "apps/compositor/src/scene_impl.h"
 
 namespace compositor {
 

@@ -5,13 +5,14 @@
 #ifndef SERVICES_GFX_COMPOSITOR_SCENE_IMPL_H_
 #define SERVICES_GFX_COMPOSITOR_SCENE_IMPL_H_
 
-#include "base/macros.h"
+#include "apps/compositor/services/interfaces/scenes.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "apps/compositor/src/compositor_engine.h"
+#include "apps/compositor/src/scene_state.h"
+#include "lib/ftl/functional/closure.h"
+#include "lib/ftl/macros.h"
 #include "mojo/public/cpp/bindings/binding.h"
 #include "mojo/public/cpp/bindings/binding_set.h"
-#include "mojo/services/gfx/composition/interfaces/scenes.mojom.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
-#include "services/gfx/compositor/compositor_engine.h"
-#include "services/gfx/compositor/scene_state.h"
 
 namespace compositor {
 
@@ -26,7 +27,7 @@ class SceneImpl : public mojo::gfx::composition::Scene,
       mojo::InterfaceRequest<mojo::gfx::composition::Scene> scene_request);
   ~SceneImpl() override;
 
-  void set_connection_error_handler(const base::Closure& handler) {
+  void set_connection_error_handler(const ftl::Closure& handler) {
     scene_binding_.set_connection_error_handler(handler);
   }
 
@@ -48,7 +49,7 @@ class SceneImpl : public mojo::gfx::composition::Scene,
   mojo::Binding<mojo::gfx::composition::Scene> scene_binding_;
   mojo::BindingSet<mojo::gfx::composition::FrameScheduler> scheduler_bindings_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneImpl);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneImpl);
 };
 
 }  // namespace compositor

@@ -5,13 +5,13 @@
 #ifndef SERVICES_GFX_COMPOSITOR_BACKEND_SCHEDULER_H_
 #define SERVICES_GFX_COMPOSITOR_BACKEND_SCHEDULER_H_
 
+#include <functional>
 #include <limits>
 #include <mutex>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 namespace compositor {
 
@@ -27,7 +27,7 @@ namespace compositor {
 //
 // An instance of the |Scheduler| interface is exposed by each |Output|
 // so as to express the timing requirements of the output.
-class Scheduler : public base::RefCountedThreadSafe<Scheduler> {
+class Scheduler : public ftl::RefCountedThreadSafe<Scheduler> {
  public:
   // Determines the behavior of |ScheduleFrame()|.
   enum class SchedulingMode {
@@ -60,11 +60,11 @@ class Scheduler : public base::RefCountedThreadSafe<Scheduler> {
   virtual void ScheduleFrame(SchedulingMode scheduling_mode) = 0;
 
  protected:
-  friend class base::RefCountedThreadSafe<Scheduler>;
+  FRIEND_REF_COUNTED_THREAD_SAFE(Scheduler);
   virtual ~Scheduler() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(Scheduler);
+  FTL_DISALLOW_COPY_AND_ASSIGN(Scheduler);
 };
 
 // Scheduling callbacks.
@@ -73,7 +73,7 @@ class Scheduler : public base::RefCountedThreadSafe<Scheduler> {
 // events produced by the output's associated |Scheduler|.
 struct SchedulerCallbacks {
   using FrameCallback =
-      base::Callback<void(const mojo::gfx::composition::FrameInfo&)>;
+      std::function<void(const mojo::gfx::composition::FrameInfo&)>;
 
   SchedulerCallbacks(const FrameCallback& update_callback,
                      const FrameCallback& snapshot_callback);

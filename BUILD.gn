@@ -8,5 +8,9 @@ group("compositor") {
   deps = [
     "//apps/compositor/services/cpp",
     "//apps/compositor/services/interfaces",
+    "//apps/compositor/glue/base",
+    "//apps/compositor/glue/gl",
+    "//apps/compositor/glue/skia",
+    "//apps/compositor/src:compositor",
   ]
 }

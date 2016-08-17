@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/graph/universe.h"
+#include "apps/compositor/src/graph/universe.h"
 
-#include "base/logging.h"
-#include "mojo/services/gfx/composition/cpp/formatting.h"
-#include "services/gfx/compositor/graph/scene_content.h"
+#include "apps/compositor/services/cpp/formatting.h"
+#include "apps/compositor/src/graph/scene_content.h"
+#include "lib/ftl/logging.h"
 
 namespace compositor {
 
@@ -15,33 +15,33 @@ Universe::Universe() {}
 Universe::~Universe() {}
 
 void Universe::AddScene(const SceneLabel& label) {
-  DCHECK(scenes_.find(label.token()) == scenes_.end());
+  FTL_DCHECK(scenes_.find(label.token()) == scenes_.end());
   scenes_.emplace(label.token(),
                   std::unique_ptr<SceneInfo>(new SceneInfo(label)));
 }
 
-void Universe::PresentScene(const scoped_refptr<const SceneContent>& content) {
+void Universe::PresentScene(const ftl::RefPtr<const SceneContent>& content) {
   auto it = scenes_.find(content->label().token());
-  DCHECK(it != scenes_.end());
+  FTL_DCHECK(it != scenes_.end());
   it->second->content_queue.emplace_front(content);
 }
 
 void Universe::RemoveScene(
     const mojo::gfx::composition::SceneToken& scene_token) {
   auto it = scenes_.find(scene_token.value);
-  DCHECK(it != scenes_.end());
+  FTL_DCHECK(it != scenes_.end());
   scenes_.erase(it);
 }
 
-scoped_refptr<const Snapshot> Universe::SnapshotScene(
+ftl::RefPtr<const Snapshot> Universe::SnapshotScene(
     const mojo::gfx::composition::SceneToken& scene_token,
     uint32_t version,
     std::ostream* block_log) {
   generation_++;
-  CHECK(generation_);
+  FTL_CHECK(generation_);
 
   Snapshotter snapshotter(this, block_log);
-  scoped_refptr<const Snapshot> snapshot =
+  ftl::RefPtr<const Snapshot> snapshot =
       snapshotter.Build(scene_token, version);
 
   // TODO(jeffbrown): Find a better way to prune unused scene versions.
@@ -71,17 +71,17 @@ Universe::SceneInfo::~SceneInfo() {}
 
 Universe::Snapshotter::Snapshotter(Universe* universe, std::ostream* block_log)
     : SnapshotBuilder(block_log), universe_(universe) {
-  DCHECK(universe_);
+  FTL_DCHECK(universe_);
 }
 
 Universe::Snapshotter::~Snapshotter() {
-  DCHECK(!cycle_);  // must have properly unwound any cycles by now
+  FTL_DCHECK(!cycle_);  // must have properly unwound any cycles by now
 }
 
 Snapshot::Disposition Universe::Snapshotter::ResolveAndSnapshotScene(
     const mojo::gfx::composition::SceneToken& scene_token,
     uint32_t version,
-    scoped_refptr<const SceneContent>* out_content) {
+    ftl::RefPtr<const SceneContent>* out_content) {
   auto it = universe_->scenes_.find(scene_token.value);
   if (it == universe_->scenes_.end()) {
     if (block_log()) {
@@ -124,7 +124,7 @@ Snapshot::Disposition Universe::Snapshotter::ResolveAndSnapshotScene(
       if (info->disposition == Snapshot::Disposition::kSuccess)
         break;
       if (info->disposition == Snapshot::Disposition::kCycle) {
-        DCHECK(cycle_);
+        FTL_DCHECK(cycle_);
         if (block_log()) {
           *block_log() << "Scene is part of a cycle: "
                        << (*it)->FormattedLabel() << std::endl;
@@ -141,9 +141,9 @@ Snapshot::Disposition Universe::Snapshotter::ResolveAndSnapshotScene(
       info->content_queue.erase(it + 1, info->content_queue.end());
   }
 
-  DCHECK(info->disposition == Snapshot::Disposition::kSuccess);
-  DCHECK(!info->content_queue.empty());
-  const scoped_refptr<const SceneContent>& content = info->content_queue.back();
+  FTL_DCHECK(info->disposition == Snapshot::Disposition::kSuccess);
+  FTL_DCHECK(!info->content_queue.empty());
+  const ftl::RefPtr<const SceneContent>& content = info->content_queue.back();
   if (!content->MatchesVersion(version)) {
     if (block_log()) {
       *block_log() << "Scene version mismatch: " << info->label.FormattedLabel()

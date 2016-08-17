@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/backend/scheduler.h"
+#include "apps/compositor/src/backend/scheduler.h"
 
 namespace compositor {
 

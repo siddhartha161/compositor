@@ -2,31 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/backend/vsync_scheduler.h"
+#include "apps/compositor/src/backend/vsync_scheduler.h"
 
 #include <algorithm>
 
-#include "base/bind.h"
-#include "base/location.h"
-#include "base/logging.h"
-#include "base/time/time.h"
-#include "base/trace_event/trace_event.h"
+#include "apps/compositor/glue/base/trace_event.h"
+#include "lib/ftl/logging.h"
 
 namespace compositor {
 
 constexpr int64_t VsyncScheduler::kMinVsyncInterval;
 constexpr int64_t VsyncScheduler::kMaxVsyncInterval;
 
-VsyncScheduler::VsyncScheduler(
-    const scoped_refptr<base::TaskRunner>& task_runner,
-    const SchedulerCallbacks& callbacks)
-    : VsyncScheduler(task_runner, callbacks, base::Bind(&MojoGetTimeTicksNow)) {
-}
+VsyncScheduler::VsyncScheduler(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
+                               const SchedulerCallbacks& callbacks)
+    : VsyncScheduler(task_runner, callbacks, &MojoGetTimeTicksNow) {}
 
-VsyncScheduler::VsyncScheduler(
-    const scoped_refptr<base::TaskRunner>& task_runner,
-    const SchedulerCallbacks& callbacks,
-    const Clock& clock)
+VsyncScheduler::VsyncScheduler(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
+                               const SchedulerCallbacks& callbacks,
+                               const Clock& clock)
     : state_(std::make_shared<State>(task_runner, callbacks, clock)) {}
 
 VsyncScheduler::~VsyncScheduler() {}
@@ -35,7 +29,7 @@ void VsyncScheduler::ScheduleFrame(SchedulingMode scheduling_mode) {
   state_->ScheduleFrame(scheduling_mode);
 }
 
-VsyncScheduler::State::State(const scoped_refptr<base::TaskRunner>& task_runner,
+VsyncScheduler::State::State(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
                              const SchedulerCallbacks& callbacks,
                              const Clock& clock)
     : task_runner_(task_runner), callbacks_(callbacks), clock_(clock) {}
@@ -52,15 +46,15 @@ bool VsyncScheduler::State::Start(int64_t vsync_timebase,
   // Ensure vsync timing is anchored on actual observations from the past.
   MojoTimeTicks now = GetTimeTicksNow();
   if (vsync_timebase > now) {
-    LOG(WARNING) << "Vsync timebase is in the future: vsync_timebase="
-                 << vsync_timebase << ", now=" << now;
+    FTL_LOG(WARNING) << "Vsync timebase is in the future: vsync_timebase="
+                     << vsync_timebase << ", now=" << now;
     return false;
   }
   if (vsync_interval < kMinVsyncInterval ||
       vsync_interval > kMaxVsyncInterval) {
-    LOG(WARNING) << "Vsync interval is invalid: vsync_interval="
-                 << vsync_interval << ", min=" << kMinVsyncInterval
-                 << ", max=" << kMaxVsyncInterval;
+    FTL_LOG(WARNING) << "Vsync interval is invalid: vsync_interval="
+                     << vsync_interval << ", min=" << kMinVsyncInterval
+                     << ", max=" << kMaxVsyncInterval;
     return false;
   }
   if (snapshot_phase < update_phase ||
@@ -69,9 +63,9 @@ bool VsyncScheduler::State::Start(int64_t vsync_timebase,
     // Updating and snapshotting must happen within the same frame interval
     // to avoid having multiple updates in progress simultanteously (which
     // doesn't make much sense if we're already compute bound).
-    LOG(WARNING) << "Vsync scheduling phases are invalid: update_phase="
-                 << update_phase << ", snapshot_phase=" << snapshot_phase
-                 << ", presentation_phase=" << presentation_phase;
+    FTL_LOG(WARNING) << "Vsync scheduling phases are invalid: update_phase="
+                     << update_phase << ", snapshot_phase=" << snapshot_phase
+                     << ", presentation_phase=" << presentation_phase;
     return false;
   }
 
@@ -124,8 +118,8 @@ void VsyncScheduler::State::ScheduleLocked(MojoTimeTicks now) {
   TRACE_EVENT2("gfx", "VsyncScheduler::ScheduleLocked", "pending_dispatch",
                pending_dispatch_, "need_update", need_update_);
 
-  DCHECK(running_);
-  DCHECK(now >= vsync_timebase_);
+  FTL_DCHECK(running_);
+  FTL_DCHECK(now >= vsync_timebase_);
 
   if (pending_dispatch_)
     return;
@@ -135,12 +129,12 @@ void VsyncScheduler::State::ScheduleLocked(MojoTimeTicks now) {
   int64_t snapshot_timebase = vsync_timebase_ + snapshot_phase_;
   uint64_t snapshot_offset = (now - snapshot_timebase) % vsync_interval_;
   int64_t snapshot_time = now - snapshot_offset + vsync_interval_;
-  DCHECK(snapshot_time >= now);
+  FTL_DCHECK(snapshot_time >= now);
 
   // Determine when the update that produced this snapshot must have begun.
   // This time may be in the past.
   int64_t update_time = snapshot_time - snapshot_phase_ + update_phase_;
-  DCHECK(update_time <= snapshot_time);
+  FTL_DCHECK(update_time <= snapshot_time);
   int64_t presentation_time =
       snapshot_time - snapshot_phase_ + presentation_phase_;
 
@@ -175,22 +169,17 @@ void VsyncScheduler::State::PostDispatchLocked(int64_t now,
   TRACE_EVENT2("gfx", "VsyncScheduler::PostDispatchLocked", "delivery_time",
                delivery_time, "update_time", update_time);
 
-  task_runner_->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&VsyncScheduler::State::DispatchThunk, shared_from_this(),
-                 generation_, action, update_time),
-      base::TimeDelta::FromMicroseconds(
-          std::max(delivery_time - now, static_cast<int64_t>(0))));
-}
+  const std::weak_ptr<State> state_weak = shared_from_this();
+  const int64_t generation = generation_;
 
-void VsyncScheduler::State::DispatchThunk(
-    const std::weak_ptr<State>& state_weak,
-    int32_t generation,
-    Action action,
-    int64_t update_time) {
-  std::shared_ptr<State> state = state_weak.lock();
-  if (state)
-    state->Dispatch(generation, action, update_time);
+  task_runner_->PostDelayedTask(
+      [state_weak, generation, action, update_time] {
+        std::shared_ptr<State> state = state_weak.lock();
+        if (state)
+          state->Dispatch(generation, action, update_time);
+      },
+      ftl::TimeDelta::FromMicroseconds(
+          std::max(delivery_time - now, static_cast<int64_t>(0))));
 }
 
 void VsyncScheduler::State::Dispatch(int32_t generation,
@@ -200,7 +189,7 @@ void VsyncScheduler::State::Dispatch(int32_t generation,
                static_cast<int>(action), "update_time", update_time);
 
   MojoTimeTicks now = GetTimeTicksNow();
-  DCHECK(update_time <= now);
+  FTL_DCHECK(update_time <= now);
 
   // Time may have passed since the callback was originally scheduled and
   // it's possible that we completely missed the deadline we were aiming for.
@@ -211,29 +200,29 @@ void VsyncScheduler::State::Dispatch(int32_t generation,
     if (!running_ || generation_ != generation)
       return;
 
-    DCHECK(pending_dispatch_);
+    FTL_DCHECK(pending_dispatch_);
 
     // Check whether we missed any deadlines.
     bool missed_deadline = false;
     if (action == Action::kUpdate) {
       int64_t update_deadline = update_time - update_phase_ + snapshot_phase_;
       if (now > update_deadline) {
-        DLOG(WARNING) << "Compositor missed update deadline by "
-                      << (now - update_deadline) << " us";
+        FTL_DLOG(WARNING) << "Compositor missed update deadline by "
+                          << (now - update_deadline) << " us";
         missed_deadline = true;
       }
     } else {
       int64_t snapshot_deadline = update_time + vsync_interval_;
       if (now > snapshot_deadline) {
-        DLOG(WARNING) << "Compositor missed snapshot deadline by "
-                      << (now - snapshot_deadline) << " us";
+        FTL_DLOG(WARNING) << "Compositor missed snapshot deadline by "
+                          << (now - snapshot_deadline) << " us";
         missed_deadline = true;
       }
     }
     if (missed_deadline) {
       uint64_t offset = (now - update_time) % vsync_interval_;
       update_time = now - offset;
-      DCHECK(update_time > now - vsync_interval_ && update_time <= now);
+      FTL_DCHECK(update_time > now - vsync_interval_ && update_time <= now);
     }
 
     // Schedule the corresponding snapshot for the update.
@@ -265,16 +254,16 @@ void VsyncScheduler::State::Dispatch(int32_t generation,
   }
 
   if (action == Action::kUpdate) {
-    callbacks_.update_callback.Run(frame_info);
+    callbacks_.update_callback(frame_info);
   } else {
-    callbacks_.snapshot_callback.Run(frame_info);
+    callbacks_.snapshot_callback(frame_info);
   }
 }
 
 void VsyncScheduler::State::SetFrameInfoLocked(
     mojo::gfx::composition::FrameInfo* frame_info,
     int64_t update_time) {
-  DCHECK(frame_info);
+  FTL_DCHECK(frame_info);
   frame_info->frame_time = update_time;
   frame_info->frame_interval = vsync_interval_;
   frame_info->frame_deadline = update_time - update_phase_ + snapshot_phase_;

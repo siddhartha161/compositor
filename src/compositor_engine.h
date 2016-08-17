@@ -8,14 +8,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/weak_ptr.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom.h"
-#include "services/gfx/compositor/backend/scheduler.h"
-#include "services/gfx/compositor/graph/universe.h"
-#include "services/gfx/compositor/renderer_state.h"
-#include "services/gfx/compositor/scene_state.h"
+#include "apps/compositor/services/interfaces/compositor.mojom.h"
+#include "apps/compositor/src/backend/scheduler.h"
+#include "apps/compositor/src/graph/universe.h"
+#include "apps/compositor/src/renderer_state.h"
+#include "apps/compositor/src/scene_state.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/weak_ptr.h"
 
 namespace compositor {
 
@@ -56,8 +55,7 @@ class CompositorEngine {
                mojo::gfx::composition::SceneMetadataPtr metadata);
 
   // Schedules a frame callback.
-  void ScheduleFrame(SceneState* scene_state,
-                     const FrameCallback& callback);
+  void ScheduleFrame(SceneState* scene_state, const FrameCallback& callback);
 
   // RENDERER REQUESTS
 
@@ -65,7 +63,7 @@ class CompositorEngine {
   // Destroys |renderer_state| if an error occurs.
   void SetRootScene(RendererState* renderer_state,
                     mojo::gfx::composition::SceneTokenPtr scene_token,
-                    uint32 scene_version,
+                    uint32_t scene_version,
                     mojo::RectPtr viewport);
 
   // Removes the root scene.
@@ -119,14 +117,14 @@ class CompositorEngine {
   void ScheduleFrameForRenderer(RendererState* renderer_state,
                                 Scheduler::SchedulingMode scheduling_mode);
 
-  void OnOutputError(const base::WeakPtr<RendererState>& renderer_state_weak);
+  void OnOutputError(const ftl::WeakPtr<RendererState>& renderer_state_weak);
   void OnOutputUpdateRequest(
-      const base::WeakPtr<RendererState>& renderer_state_weak,
+      const ftl::WeakPtr<RendererState>& renderer_state_weak,
       const mojo::gfx::composition::FrameInfo& frame_info);
   void OnOutputSnapshotRequest(
-      const base::WeakPtr<RendererState>& renderer_state_weak,
+      const ftl::WeakPtr<RendererState>& renderer_state_weak,
       const mojo::gfx::composition::FrameInfo& frame_info);
-  void OnPresentScene(const base::WeakPtr<SceneState>& scene_state_weak,
+  void OnPresentScene(const ftl::WeakPtr<SceneState>& scene_state_weak,
                       int64_t presentation_time);
 
   bool ResolveSceneReference(
@@ -153,9 +151,9 @@ class CompositorEngine {
 
   Universe universe_;
 
-  base::WeakPtrFactory<CompositorEngine> weak_factory_;
+  ftl::WeakPtrFactory<CompositorEngine> weak_factory_;
 
-  DISALLOW_COPY_AND_ASSIGN(CompositorEngine);
+  FTL_DISALLOW_COPY_AND_ASSIGN(CompositorEngine);
 };
 
 }  // namespace compositor

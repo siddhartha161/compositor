@@ -2,19 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/renderer_impl.h"
-
-#include "base/bind.h"
-#include "base/bind_helpers.h"
+#include "apps/compositor/src/renderer_impl.h"
 
 namespace compositor {
-namespace {
-void RunScheduleFrameCallback(
-    const RendererImpl::ScheduleFrameCallback& callback,
-    mojo::gfx::composition::FrameInfoPtr info) {
-  callback.Run(info.Pass());
-}
-}  // namespace
 
 RendererImpl::RendererImpl(
     CompositorEngine* engine,
@@ -34,7 +24,7 @@ void RendererImpl::GetHitTester(
 
 void RendererImpl::SetRootScene(
     mojo::gfx::composition::SceneTokenPtr scene_token,
-    uint32 scene_version,
+    uint32_t scene_version,
     mojo::RectPtr viewport) {
   engine_->SetRootScene(state_, scene_token.Pass(), scene_version,
                         viewport.Pass());
@@ -52,7 +42,9 @@ void RendererImpl::GetScheduler(
 
 void RendererImpl::ScheduleFrame(const ScheduleFrameCallback& callback) {
   engine_->ScheduleFrame(state_,
-                         base::Bind(&RunScheduleFrameCallback, callback));
+                         [callback](mojo::gfx::composition::FrameInfoPtr info) {
+                           callback.Run(std::move(info));
+                         });
 }
 
 void RendererImpl::HitTest(mojo::PointFPtr point,

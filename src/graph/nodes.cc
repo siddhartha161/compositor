@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/graph/nodes.h"
+#include "apps/compositor/src/graph/nodes.h"
 
 #include <ostream>
 
-#include "base/logging.h"
-#include "mojo/services/gfx/composition/cpp/formatting.h"
-#include "mojo/skia/type_converters.h"
-#include "services/gfx/compositor/graph/scene_content.h"
-#include "services/gfx/compositor/graph/snapshot.h"
-#include "services/gfx/compositor/graph/transform_pair.h"
-#include "services/gfx/compositor/render/render_image.h"
+#include "apps/compositor/glue/skia/type_converters.h"
+#include "apps/compositor/services/cpp/formatting.h"
+#include "apps/compositor/src/graph/scene_content.h"
+#include "apps/compositor/src/graph/snapshot.h"
+#include "apps/compositor/src/graph/transform_pair.h"
+#include "apps/compositor/src/render/render_image.h"
+#include "lib/ftl/logging.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkMatrix.h"
@@ -28,7 +28,7 @@ SkColor MakeSkColor(const mojo::gfx::composition::Color& color) {
 }
 
 void SetPaintForBlend(SkPaint* paint, mojo::gfx::composition::Blend* blend) {
-  DCHECK(paint);
+  FTL_DCHECK(paint);
   if (blend)
     paint->setAlpha(blend->alpha);
 }
@@ -59,7 +59,7 @@ std::string Node::FormattedLabel(const SceneContent* content) const {
 }
 
 bool Node::RecordContent(SceneContentBuilder* builder) const {
-  DCHECK(builder);
+  FTL_DCHECK(builder);
 
   for (const auto& child_node_id : child_node_ids_) {
     if (!builder->RequireNode(child_node_id, node_id_))
@@ -70,15 +70,15 @@ bool Node::RecordContent(SceneContentBuilder* builder) const {
 
 Snapshot::Disposition Node::RecordSnapshot(const SceneContent* content,
                                            SnapshotBuilder* builder) const {
-  DCHECK(content);
-  DCHECK(builder);
+  FTL_DCHECK(content);
+  FTL_DCHECK(builder);
 
   switch (combinator_) {
     // MERGE: All or nothing.
     case Combinator::MERGE: {
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
+        FTL_DCHECK(child_node);
         Snapshot::Disposition disposition =
             builder->SnapshotNode(child_node, content);
         if (disposition == Snapshot::Disposition::kCycle)
@@ -101,7 +101,7 @@ Snapshot::Disposition Node::RecordSnapshot(const SceneContent* content,
     case Combinator::PRUNE: {
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
+        FTL_DCHECK(child_node);
         Snapshot::Disposition disposition =
             builder->SnapshotNode(child_node, content);
         if (disposition == Snapshot::Disposition::kCycle)
@@ -116,7 +116,7 @@ Snapshot::Disposition Node::RecordSnapshot(const SceneContent* content,
         return Snapshot::Disposition::kSuccess;
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
+        FTL_DCHECK(child_node);
         Snapshot::Disposition disposition =
             builder->SnapshotNode(child_node, content);
         if (disposition != Snapshot::Disposition::kBlocked)
@@ -145,16 +145,16 @@ template <typename Func>
 void Node::TraverseSnapshottedChildren(const SceneContent* content,
                                        const Snapshot* snapshot,
                                        const Func& func) const {
-  DCHECK(content);
-  DCHECK(snapshot);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
 
   switch (combinator_) {
     // MERGE: All or nothing.
     case Combinator::MERGE: {
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
-        DCHECK(!snapshot->IsNodeBlocked(child_node));
+        FTL_DCHECK(child_node);
+        FTL_DCHECK(!snapshot->IsNodeBlocked(child_node));
         if (!func(child_node))
           return;
       }
@@ -165,7 +165,7 @@ void Node::TraverseSnapshottedChildren(const SceneContent* content,
     case Combinator::PRUNE: {
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
+        FTL_DCHECK(child_node);
         if (!snapshot->IsNodeBlocked(child_node) && !func(child_node))
           return;
       }
@@ -178,18 +178,18 @@ void Node::TraverseSnapshottedChildren(const SceneContent* content,
         return;
       for (uint32_t child_node_id : child_node_ids_) {
         const Node* child_node = content->GetNode(child_node_id);
-        DCHECK(child_node);
+        FTL_DCHECK(child_node);
         if (!snapshot->IsNodeBlocked(child_node)) {
           func(child_node);  // don't care about the result because we
           return;            // always stop after the first one
         }
       }
-      NOTREACHED();
+      FTL_NOTREACHED();
       return;
     }
 
     default: {
-      NOTREACHED();
+      FTL_NOTREACHED();
       return;
     }
   }
@@ -198,9 +198,9 @@ void Node::TraverseSnapshottedChildren(const SceneContent* content,
 void Node::Paint(const SceneContent* content,
                  const Snapshot* snapshot,
                  SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   const bool must_save = content_transform_ || content_clip_;
   if (must_save) {
@@ -220,9 +220,9 @@ void Node::Paint(const SceneContent* content,
 void Node::PaintInner(const SceneContent* content,
                       const Snapshot* snapshot,
                       SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   TraverseSnapshottedChildren(
       content, snapshot,
@@ -237,9 +237,9 @@ bool Node::HitTest(const SceneContent* content,
                    const SkPoint& parent_point,
                    const SkMatrix44& global_to_parent_transform,
                    mojo::Array<mojo::gfx::composition::HitPtr>* hits) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(hits);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(hits);
 
   // TODO(jeffbrown): These calculations should probably be happening using
   // a 4x4 matrix instead.
@@ -271,9 +271,9 @@ bool Node::HitTestInner(
     const SkPoint& local_point,
     const SkMatrix44& global_to_local_transform,
     mojo::Array<mojo::gfx::composition::HitPtr>* hits) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(hits);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(hits);
 
   // TODO(jeffbrown): Implement a more efficient way to traverse children in
   // reverse order.
@@ -298,9 +298,9 @@ bool Node::HitTestSelf(
     const SkPoint& local_point,
     const SkMatrix44& global_to_local_transform,
     mojo::Array<mojo::gfx::composition::HitPtr>* hits) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(hits);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(hits);
 
   if (!hit_test_behavior_ ||
       hit_test_behavior_->visibility ==
@@ -343,9 +343,9 @@ RectNode::~RectNode() {}
 void RectNode::PaintInner(const SceneContent* content,
                           const Snapshot* snapshot,
                           SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   SkPaint paint;
   paint.setColor(MakeSkColor(color_));
@@ -363,7 +363,7 @@ ImageNode::ImageNode(
     const std::vector<uint32_t>& child_node_ids,
     const mojo::RectF& content_rect,
     mojo::RectFPtr image_rect,
-    uint32 image_resource_id,
+    uint32_t image_resource_id,
     mojo::gfx::composition::BlendPtr blend)
     : Node(node_id,
            std::move(content_transform),
@@ -379,7 +379,7 @@ ImageNode::ImageNode(
 ImageNode::~ImageNode() {}
 
 bool ImageNode::RecordContent(SceneContentBuilder* builder) const {
-  DCHECK(builder);
+  FTL_DCHECK(builder);
 
   return Node::RecordContent(builder) &&
          builder->RequireResource(image_resource_id_, Resource::Type::kImage,
@@ -389,13 +389,13 @@ bool ImageNode::RecordContent(SceneContentBuilder* builder) const {
 void ImageNode::PaintInner(const SceneContent* content,
                            const Snapshot* snapshot,
                            SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   auto image_resource = static_cast<const ImageResource*>(
       content->GetResource(image_resource_id_, Resource::Type::kImage));
-  DCHECK(image_resource);
+  FTL_DCHECK(image_resource);
 
   SkPaint paint;
   SetPaintForBlend(&paint, blend_.get());
@@ -431,7 +431,7 @@ SceneNode::SceneNode(
 SceneNode::~SceneNode() {}
 
 bool SceneNode::RecordContent(SceneContentBuilder* builder) const {
-  DCHECK(builder);
+  FTL_DCHECK(builder);
 
   return Node::RecordContent(builder) &&
          builder->RequireResource(scene_resource_id_, Resource::Type::kScene,
@@ -441,8 +441,8 @@ bool SceneNode::RecordContent(SceneContentBuilder* builder) const {
 Snapshot::Disposition SceneNode::RecordSnapshot(
     const SceneContent* content,
     SnapshotBuilder* builder) const {
-  DCHECK(content);
-  DCHECK(builder);
+  FTL_DCHECK(content);
+  FTL_DCHECK(builder);
 
   Snapshot::Disposition disposition =
       builder->SnapshotReferencedScene(this, content);
@@ -454,13 +454,13 @@ Snapshot::Disposition SceneNode::RecordSnapshot(
 void SceneNode::PaintInner(const SceneContent* content,
                            const Snapshot* snapshot,
                            SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   const SceneContent* resolved_content =
       snapshot->GetResolvedSceneContent(this);
-  DCHECK(resolved_content);
+  FTL_DCHECK(resolved_content);
   resolved_content->Paint(snapshot, canvas);
 
   Node::PaintInner(content, snapshot, canvas);
@@ -472,9 +472,9 @@ bool SceneNode::HitTestInner(
     const SkPoint& local_point,
     const SkMatrix44& global_to_local_transform,
     mojo::Array<mojo::gfx::composition::HitPtr>* hits) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(hits);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(hits);
 
   if (Node::HitTestInner(content, snapshot, local_point,
                          global_to_local_transform, hits))
@@ -482,7 +482,7 @@ bool SceneNode::HitTestInner(
 
   const SceneContent* resolved_content =
       snapshot->GetResolvedSceneContent(this);
-  DCHECK(resolved_content);
+  FTL_DCHECK(resolved_content);
 
   mojo::gfx::composition::SceneHitPtr scene_hit;
   bool opaque = resolved_content->HitTest(
@@ -518,9 +518,9 @@ LayerNode::~LayerNode() {}
 void LayerNode::PaintInner(const SceneContent* content,
                            const Snapshot* snapshot,
                            SkCanvas* canvas) const {
-  DCHECK(content);
-  DCHECK(snapshot);
-  DCHECK(canvas);
+  FTL_DCHECK(content);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(canvas);
 
   SkPaint paint;
   SetPaintForBlend(&paint, blend_.get());

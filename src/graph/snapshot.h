@@ -9,12 +9,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
+#include "apps/compositor/services/interfaces/hit_tests.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "apps/compositor/src/render/render_frame.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 #include "mojo/services/geometry/interfaces/geometry.mojom.h"
-#include "mojo/services/gfx/composition/interfaces/hit_tests.mojom.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
-#include "services/gfx/compositor/render/render_frame.h"
 
 namespace compositor {
 
@@ -41,7 +41,7 @@ class SceneNode;
 //
 // Once fully constructed, instances of this class are immutable and
 // reference counted so they may be bound to scene references in other scenes.
-class Snapshot : public base::RefCounted<Snapshot> {
+class Snapshot : public ftl::RefCountedThreadSafe<Snapshot> {
  public:
   // Describes the result of a snapshot operation.
   enum class Disposition {
@@ -65,8 +65,8 @@ class Snapshot : public base::RefCounted<Snapshot> {
 
   // Paints the content of the snapshot to produce a frame to be rendered.
   // Only valid if |!is_blocked()|.
-  scoped_refptr<RenderFrame> Paint(const RenderFrame::Metadata& metadata,
-                                   const mojo::Rect& viewport) const;
+  ftl::RefPtr<RenderFrame> Paint(const RenderFrame::Metadata& metadata,
+                                 const mojo::Rect& viewport) const;
 
   // Performs a hit test at the specified point, populating the result.
   // Only valid if |!is_blocked()|.
@@ -83,7 +83,7 @@ class Snapshot : public base::RefCounted<Snapshot> {
       const SceneNode* scene_node) const;
 
  private:
-  friend class base::RefCounted<Snapshot>;
+  FRIEND_REF_COUNTED_THREAD_SAFE(Snapshot);
   friend class SnapshotBuilder;
 
   Snapshot();
@@ -100,18 +100,18 @@ class Snapshot : public base::RefCounted<Snapshot> {
   // nodes used by the snapshot so that we can use bare pointers for nodes
   // and avoid excess reference counting overhead in other data structures.
   // Empty when the snapshot is blocked.
-  scoped_refptr<const SceneContent> root_scene_content_;
+  ftl::RefPtr<const SceneContent> root_scene_content_;
 
   // Map of scenes which were resolved from scene nodes.
   // Empty when the snapshot is blocked.
-  std::unordered_map<const SceneNode*, scoped_refptr<const SceneContent>>
+  std::unordered_map<const SceneNode*, ftl::RefPtr<const SceneContent>>
       resolved_scene_contents_;
 
   // Node dispositions.  We only ever observe |kSuccess| or |kBlocked| here.
   // Empty when the snapshot is blocked.
   std::unordered_map<const Node*, Disposition> node_dispositions_;
 
-  DISALLOW_COPY_AND_ASSIGN(Snapshot);
+  FTL_DISALLOW_COPY_AND_ASSIGN(Snapshot);
 };
 
 // Builds a table of all of the state which will be required for rendering
@@ -135,7 +135,7 @@ class SnapshotBuilder {
       const SceneContent* referrer_content);
 
   // Builds a snapshot rooted at the specified scene.
-  scoped_refptr<const Snapshot> Build(
+  ftl::RefPtr<const Snapshot> Build(
       const mojo::gfx::composition::SceneToken& scene_token,
       uint32_t version);
 
@@ -144,7 +144,7 @@ class SnapshotBuilder {
   virtual Snapshot::Disposition ResolveAndSnapshotScene(
       const mojo::gfx::composition::SceneToken& scene_token,
       uint32_t version,
-      scoped_refptr<const SceneContent>* out_content) = 0;
+      ftl::RefPtr<const SceneContent>* out_content) = 0;
 
   // Snapshots a scene.
   Snapshot::Disposition SnapshotSceneContent(const SceneContent* content);
@@ -153,12 +153,12 @@ class SnapshotBuilder {
   Snapshot::Disposition AddDependencyResolveAndSnapshotScene(
       const mojo::gfx::composition::SceneToken& scene_token,
       uint32_t version,
-      scoped_refptr<const SceneContent>* out_content);
+      ftl::RefPtr<const SceneContent>* out_content);
 
-  scoped_refptr<Snapshot> snapshot_;
+  ftl::RefPtr<Snapshot> snapshot_;
   std::ostream* const block_log_;
 
-  DISALLOW_COPY_AND_ASSIGN(SnapshotBuilder);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SnapshotBuilder);
 };
 
 }  // namespace compositor

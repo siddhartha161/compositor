@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/graph/scene_label.h"
+#include "apps/compositor/src/graph/scene_label.h"
 
 #include <cinttypes>
 
-#include "base/strings/stringprintf.h"
+#include "lib/ftl/strings/string_printf.h"
 
 namespace compositor {
 
@@ -20,17 +20,17 @@ SceneLabel::~SceneLabel() {}
 
 std::string SceneLabel::FormattedLabel() const {
   return label_.empty()
-             ? base::StringPrintf("<S%d>", token_)
-             : base::StringPrintf("<S%d:%s>", token_, label_.c_str());
+             ? ftl::StringPrintf("<S%d>", token_)
+             : ftl::StringPrintf("<S%d:%s>", token_, label_.c_str());
 }
 
 std::string SceneLabel::FormattedLabelForVersion(
     uint32_t version,
     int64_t presentation_time) const {
   return label_.empty()
-             ? base::StringPrintf("<S%d/v%d@%" PRId64 ">", token_, version,
+             ? ftl::StringPrintf("<S%d/v%d@%" PRId64 ">", token_, version,
                                   presentation_time)
-             : base::StringPrintf("<S%d:%s/v%d@%" PRId64 ">", token_,
+             : ftl::StringPrintf("<S%d:%s/v%d@%" PRId64 ">", token_,
                                   label_.c_str(), version, presentation_time);
 }
 
@@ -38,9 +38,9 @@ std::string SceneLabel::FormattedLabelForNode(uint32_t version,
                                               int64_t presentation_time,
                                               uint32_t node_id) const {
   return label_.empty()
-             ? base::StringPrintf("<S%d/v%d@%" PRId64 ">[#%d]", token_, version,
+             ? ftl::StringPrintf("<S%d/v%d@%" PRId64 ">[#%d]", token_, version,
                                   presentation_time, node_id)
-             : base::StringPrintf("<S%d:%s/v%d@%" PRId64 ">[#%d]", token_,
+             : ftl::StringPrintf("<S%d:%s/v%d@%" PRId64 ">[#%d]", token_,
                                   label_.c_str(), version, presentation_time,
                                   node_id);
 }

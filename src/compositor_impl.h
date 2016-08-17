@@ -5,9 +5,9 @@
 #ifndef SERVICES_GFX_COMPOSITOR_COMPOSITOR_IMPL_H_
 #define SERVICES_GFX_COMPOSITOR_COMPOSITOR_IMPL_H_
 
-#include "base/macros.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom.h"
-#include "services/gfx/compositor/compositor_engine.h"
+#include "apps/compositor/services/interfaces/compositor.mojom.h"
+#include "apps/compositor/src/compositor_engine.h"
+#include "lib/ftl/macros.h"
 
 namespace compositor {
 
@@ -30,7 +30,7 @@ class CompositorImpl : public mojo::gfx::composition::Compositor {
 
   CompositorEngine* engine_;
 
-  DISALLOW_COPY_AND_ASSIGN(CompositorImpl);
+  FTL_DISALLOW_COPY_AND_ASSIGN(CompositorImpl);
 };
 
 }  // namespace compositor

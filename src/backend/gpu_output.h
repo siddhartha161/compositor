@@ -5,20 +5,21 @@
 #ifndef SERVICES_GFX_COMPOSITOR_BACKEND_GPU_OUTPUT_H_
 #define SERVICES_GFX_COMPOSITOR_BACKEND_GPU_OUTPUT_H_
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <thread>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "base/synchronization/waitable_event.h"
-#include "base/task_runner.h"
-#include "base/threading/thread.h"
+#include "apps/compositor/src/backend/gpu_rasterizer.h"
+#include "apps/compositor/src/backend/output.h"
+#include "apps/compositor/src/backend/vsync_scheduler.h"
+#include "lib/ftl/functional/closure.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
+#include "lib/ftl/synchronization/waitable_event.h"
+#include "lib/ftl/tasks/task_runner.h"
 #include "mojo/services/gpu/interfaces/context_provider.mojom.h"
-#include "services/gfx/compositor/backend/gpu_rasterizer.h"
-#include "services/gfx/compositor/backend/output.h"
-#include "services/gfx/compositor/backend/vsync_scheduler.h"
 
 namespace compositor {
 
@@ -27,11 +28,11 @@ class GpuOutput : public Output, private GpuRasterizer::Callbacks {
  public:
   GpuOutput(mojo::InterfaceHandle<mojo::ContextProvider> context_provider,
             const SchedulerCallbacks& scheduler_callbacks,
-            const base::Closure& error_callback);
+            const ftl::Closure& error_callback);
   ~GpuOutput() override;
 
   Scheduler* GetScheduler() override;
-  void SubmitFrame(const scoped_refptr<RenderFrame>& frame) override;
+  void SubmitFrame(const ftl::RefPtr<RenderFrame>& frame) override;
 
  private:
   struct FrameData {
@@ -41,19 +42,19 @@ class GpuOutput : public Output, private GpuRasterizer::Callbacks {
       Finished  // draw has finished
     };
 
-    FrameData(const scoped_refptr<RenderFrame>& frame, int64_t submit_time);
+    FrameData(const ftl::RefPtr<RenderFrame>& frame, int64_t submit_time);
     ~FrameData();
 
     void ResetDrawState();
 
-    const scoped_refptr<RenderFrame> frame;
+    const ftl::RefPtr<RenderFrame> frame;
     const int64_t submit_time;
     State state = State::Pending;
     int64_t draw_started_time = 0;  // time when drawing began
     int64_t draw_issued_time = 0;   // time when awaiting for finish began
 
    private:
-    DISALLOW_COPY_AND_ASSIGN(FrameData);
+    FTL_DISALLOW_COPY_AND_ASSIGN(FrameData);
   };
 
   // |GpuRasterizer::Callbacks|:
@@ -71,18 +72,18 @@ class GpuOutput : public Output, private GpuRasterizer::Callbacks {
   void DestroyRasterizer();
   void PostErrorCallback();
 
-  scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner_;
-  scoped_refptr<VsyncScheduler> vsync_scheduler_;
-  base::Closure error_callback_;
+  ftl::RefPtr<ftl::TaskRunner> compositor_task_runner_;
+  ftl::RefPtr<VsyncScheduler> vsync_scheduler_;
+  ftl::Closure error_callback_;
 
   // Maximum number of frames to hold in the drawing pipeline.
   // Any more than this and we start dropping them.
   uint32_t pipeline_depth_;
 
   // The rasterizer itself runs on its own thread.
-  std::unique_ptr<base::Thread> rasterizer_thread_;
-  scoped_refptr<base::SingleThreadTaskRunner> rasterizer_task_runner_;
-  base::WaitableEvent rasterizer_initialized_;
+  std::thread rasterizer_thread_;
+  ftl::RefPtr<ftl::TaskRunner> rasterizer_task_runner_;
+  ftl::ManualResetWaitableEvent rasterizer_initialized_;
   std::unique_ptr<GpuRasterizer> rasterizer_;
 
   // Holds state shared between the compositor and rasterizer threads.
@@ -111,7 +112,7 @@ class GpuOutput : public Output, private GpuRasterizer::Callbacks {
     bool draw_scheduled = false;
   } shared_state_;
 
-  DISALLOW_COPY_AND_ASSIGN(GpuOutput);
+  FTL_DISALLOW_COPY_AND_ASSIGN(GpuOutput);
 };
 
 }  // namespace compositor

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/graph/resources.h"
+#include "apps/compositor/src/graph/resources.h"
 
-#include "base/logging.h"
+#include "lib/ftl/logging.h"
 
 namespace compositor {
 
@@ -22,9 +22,9 @@ Resource::Type SceneResource::type() const {
   return Type::kScene;
 }
 
-ImageResource::ImageResource(const scoped_refptr<RenderImage>& image)
+ImageResource::ImageResource(const ftl::RefPtr<RenderImage>& image)
     : image_(image) {
-  DCHECK(image);
+  FTL_DCHECK(image);
 }
 
 ImageResource::~ImageResource() {}

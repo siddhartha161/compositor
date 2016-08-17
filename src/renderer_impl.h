@@ -5,13 +5,14 @@
 #ifndef SERVICES_GFX_COMPOSITOR_RENDERER_IMPL_H_
 #define SERVICES_GFX_COMPOSITOR_RENDERER_IMPL_H_
 
-#include "base/callback.h"
-#include "base/macros.h"
+#include <functional>
+
+#include "apps/compositor/services/interfaces/renderers.mojom.h"
+#include "apps/compositor/src/compositor_engine.h"
+#include "apps/compositor/src/renderer_state.h"
+#include "lib/ftl/macros.h"
 #include "mojo/public/cpp/bindings/binding.h"
 #include "mojo/public/cpp/bindings/binding_set.h"
-#include "mojo/services/gfx/composition/interfaces/renderers.mojom.h"
-#include "services/gfx/compositor/compositor_engine.h"
-#include "services/gfx/compositor/renderer_state.h"
 
 namespace compositor {
 
@@ -27,14 +28,14 @@ class RendererImpl : public mojo::gfx::composition::Renderer,
                    renderer_request);
   ~RendererImpl() override;
 
-  void set_connection_error_handler(const base::Closure& handler) {
+  void set_connection_error_handler(const ftl::Closure& handler) {
     renderer_binding_.set_connection_error_handler(handler);
   }
 
  private:
   // |Renderer|:
   void SetRootScene(mojo::gfx::composition::SceneTokenPtr scene_token,
-                    uint32 scene_version,
+                    uint32_t scene_version,
                     mojo::RectPtr viewport) override;
   void ClearRootScene() override;
   void GetScheduler(
@@ -55,7 +56,7 @@ class RendererImpl : public mojo::gfx::composition::Renderer,
   mojo::BindingSet<mojo::gfx::composition::FrameScheduler> scheduler_bindings_;
   mojo::BindingSet<mojo::gfx::composition::HitTester> hit_tester_bindings;
 
-  DISALLOW_COPY_AND_ASSIGN(RendererImpl);
+  FTL_DISALLOW_COPY_AND_ASSIGN(RendererImpl);
 };
 
 }  // namespace compositor

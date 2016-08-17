@@ -2,20 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/scene_impl.h"
+#include "apps/compositor/src/scene_impl.h"
 
 #include <utility>
 
-#include "base/bind.h"
-#include "base/bind_helpers.h"
-
 namespace compositor {
-namespace {
-void RunScheduleFrameCallback(const SceneImpl::ScheduleFrameCallback& callback,
-                              mojo::gfx::composition::FrameInfoPtr info) {
-  callback.Run(info.Pass());
-}
-}  // namespace
 
 SceneImpl::SceneImpl(
     CompositorEngine* engine,
@@ -49,7 +40,9 @@ void SceneImpl::GetScheduler(
 
 void SceneImpl::ScheduleFrame(const ScheduleFrameCallback& callback) {
   engine_->ScheduleFrame(state_,
-                         base::Bind(RunScheduleFrameCallback, callback));
+                         [callback](mojo::gfx::composition::FrameInfoPtr info) {
+                           callback.Run(std::move(info));
+                         });
 }
 
 }  // namespace compositor

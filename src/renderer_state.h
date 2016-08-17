@@ -8,14 +8,14 @@
 #include <memory>
 #include <string>
 
-#include "base/macros.h"
-#include "base/memory/weak_ptr.h"
-#include "mojo/services/gfx/composition/cpp/formatting.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom.h"
-#include "services/gfx/compositor/backend/output.h"
-#include "services/gfx/compositor/frame_dispatcher.h"
-#include "services/gfx/compositor/graph/snapshot.h"
-#include "services/gfx/compositor/scene_state.h"
+#include "apps/compositor/services/cpp/formatting.h"
+#include "apps/compositor/services/interfaces/compositor.mojom.h"
+#include "apps/compositor/src/backend/output.h"
+#include "apps/compositor/src/frame_dispatcher.h"
+#include "apps/compositor/src/graph/snapshot.h"
+#include "apps/compositor/src/scene_state.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/weak_ptr.h"
 
 namespace compositor {
 
@@ -26,7 +26,7 @@ class RendererState {
   RendererState(uint32_t id, const std::string& label);
   ~RendererState();
 
-  base::WeakPtr<RendererState> GetWeakPtr() {
+  ftl::WeakPtr<RendererState> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }
 
@@ -57,20 +57,20 @@ class RendererState {
   bool ClearRootScene();
 
   // The currently visible frame, or null if none.
-  scoped_refptr<const Snapshot> visible_snapshot() const {
+  ftl::RefPtr<const Snapshot> visible_snapshot() const {
     return visible_snapshot_;
   }
 
   // The most recent snapshot (which may be blocked from rendering), or
   // null if none.
-  scoped_refptr<const Snapshot> current_snapshot() const {
+  ftl::RefPtr<const Snapshot> current_snapshot() const {
     return current_snapshot_;
   }
 
   // Sets the current snapshot, or null if none.
   // Always updates |current_snapshot()|.
   // If the snapshot is not blocked, also updates |visible_snapshot()|.
-  void SetSnapshot(const scoped_refptr<const Snapshot>& snapshot);
+  void SetSnapshot(const ftl::RefPtr<const Snapshot>& snapshot);
 
   FrameDispatcher& frame_dispatcher() { return frame_dispatcher_; }
 
@@ -90,12 +90,12 @@ class RendererState {
   uint32_t root_scene_version_ = mojo::gfx::composition::kSceneVersionNone;
   mojo::Rect root_scene_viewport_;
 
-  scoped_refptr<const Snapshot> visible_snapshot_;
-  scoped_refptr<const Snapshot> current_snapshot_;
+  ftl::RefPtr<const Snapshot> visible_snapshot_;
+  ftl::RefPtr<const Snapshot> current_snapshot_;
 
-  base::WeakPtrFactory<RendererState> weak_factory_;
+  ftl::WeakPtrFactory<RendererState> weak_factory_;
 
-  DISALLOW_COPY_AND_ASSIGN(RendererState);
+  FTL_DISALLOW_COPY_AND_ASSIGN(RendererState);
 };
 
 std::ostream& operator<<(std::ostream& os, RendererState* renderer_state);

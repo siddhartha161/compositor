@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/graph/scene_content.h"
+#include "apps/compositor/src/graph/scene_content.h"
 
 #include <ostream>
 
-#include "base/logging.h"
-#include "services/gfx/compositor/graph/scene_def.h"
+#include "apps/compositor/src/graph/scene_def.h"
+#include "lib/ftl/logging.h"
 
 namespace compositor {
 
@@ -41,8 +41,8 @@ bool SceneContent::HitTest(
     const SkPoint& scene_point,
     const SkMatrix44& global_to_scene_transform,
     mojo::gfx::composition::SceneHitPtr* out_scene_hit) const {
-  DCHECK(snapshot);
-  DCHECK(out_scene_hit);
+  FTL_DCHECK(snapshot);
+  FTL_DCHECK(out_scene_hit);
 
   const Node* root = GetRootNodeIfExists();
   if (!root)
@@ -65,14 +65,14 @@ bool SceneContent::HitTest(
 const Resource* SceneContent::GetResource(uint32_t resource_id,
                                           Resource::Type resource_type) const {
   auto it = resources_.find(resource_id);
-  DCHECK(it != resources_.end());
-  DCHECK(it->second->type() == resource_type);
+  FTL_DCHECK(it != resources_.end());
+  FTL_DCHECK(it->second->type() == resource_type);
   return it->second.get();
 }
 
 const Node* SceneContent::GetNode(uint32_t node_id) const {
   auto it = nodes_.find(node_id);
-  DCHECK(it != nodes_.end());
+  FTL_DCHECK(it != nodes_.end());
   return it->second.get();
 }
 
@@ -100,7 +100,7 @@ const Resource* SceneContentBuilder::RequireResource(
     uint32_t resource_id,
     Resource::Type resource_type,
     uint32_t referrer_node_id) {
-  DCHECK(content_);
+  FTL_DCHECK(content_);
 
   auto it = content_->resources_.find(resource_id);
   if (it != content_->resources_.end())
@@ -126,7 +126,7 @@ const Resource* SceneContentBuilder::RequireResource(
 
 const Node* SceneContentBuilder::RequireNode(uint32_t node_id,
                                              uint32_t referrer_node_id) {
-  DCHECK(content_);
+  FTL_DCHECK(content_);
 
   auto it = content_->nodes_.find(node_id);
   if (it != content_->nodes_.end()) {
@@ -148,13 +148,13 @@ const Node* SceneContentBuilder::RequireNode(uint32_t node_id,
 }
 
 bool SceneContentBuilder::AddNode(const Node* node) {
-  DCHECK(content_);
-  DCHECK(node);
+  FTL_DCHECK(content_);
+  FTL_DCHECK(node);
 
   // Reserve a spot in the table to mark the node recording in progress.
-  DCHECK(content_->nodes_.size() < content_->nodes_.bucket_count());
+  FTL_DCHECK(content_->nodes_.size() < content_->nodes_.bucket_count());
   auto storage = content_->nodes_.emplace(node->node_id(), nullptr);
-  DCHECK(storage.second);
+  FTL_DCHECK(storage.second);
 
   // Record the node's content.
   // This performs a depth first search of the node.  If it succeeds, we
@@ -164,16 +164,16 @@ bool SceneContentBuilder::AddNode(const Node* node) {
     return false;
 
   // Store the node in the table.
-  // It is safe to use the interator returned by emplace even though additional
+  // It is safe to use the iterator returned by emplace even though additional
   // nodes may have been added since the map's bucket count was initialized
   // at creation time to the total number of nodes so it should never be
   // rehashed during this traversal.
-  storage.first->second = node;
+  storage.first->second = ftl::Ref(node);
   return true;
 }
 
-scoped_refptr<const SceneContent> SceneContentBuilder::Build() {
-  DCHECK(content_);
+ftl::RefPtr<const SceneContent> SceneContentBuilder::Build() {
+  FTL_DCHECK(content_);
 
   const Node* root = FindNode(mojo::gfx::composition::kSceneRootNodeId);
   return !root || AddNode(root) ? std::move(content_) : nullptr;

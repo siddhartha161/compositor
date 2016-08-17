@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/backend/vsync_scheduler.h"
+#include "apps/compositor/src/backend/vsync_scheduler.h"
 
 #include <queue>
 
@@ -67,12 +67,12 @@ class VsyncSchedulerTest : public testing::Test {
   }
 
   void FastForwardTo(int64_t time) {
-    DCHECK(time >= GetTimeTicksNow());
+    FTL_DCHECK(time >= GetTimeTicksNow());
     task_runner_->FastForwardBy(
         base::TimeDelta::FromMicroseconds(time - GetTimeTicksNow()));
   }
 
-  scoped_refptr<VsyncScheduler> scheduler_;
+  ftl::RefPtr<VsyncScheduler> scheduler_;
 
  private:
   enum class CallbackType {
@@ -125,7 +125,7 @@ class VsyncSchedulerTest : public testing::Test {
     }
   }
 
-  scoped_refptr<base::TestMockTimeTaskRunner> task_runner_;
+  ftl::RefPtr<base::TestMockTimeTaskRunner> task_runner_;
   std::queue<ExpectedCallback> expected_callbacks_;
 };
 

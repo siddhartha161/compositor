@@ -2,15 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/compositor_app.h"
+#include "apps/compositor/src/compositor_app.h"
 
-#include "base/command_line.h"
-#include "base/logging.h"
-#include "base/trace_event/trace_event.h"
-#include "mojo/common/tracing_impl.h"
-#include "mojo/public/c/system/main.h"
+#include "apps/compositor/src/compositor_impl.h"
 #include "mojo/public/cpp/application/service_provider_impl.h"
-#include "services/gfx/compositor/compositor_impl.h"
 
 namespace compositor {
 
@@ -19,14 +14,6 @@ CompositorApp::CompositorApp() {}
 CompositorApp::~CompositorApp() {}
 
 void CompositorApp::OnInitialize() {
-  auto command_line = base::CommandLine::ForCurrentProcess();
-  command_line->InitFromArgv(args());
-  logging::LoggingSettings settings;
-  settings.logging_dest = logging::LOG_TO_SYSTEM_DEBUG_LOG;
-  logging::InitLogging(settings);
-
-  tracing_.Initialize(shell(), &args());
-
   engine_.reset(new CompositorEngine());
 }
 

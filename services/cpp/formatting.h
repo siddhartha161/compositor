@@ -5,10 +5,10 @@
 #ifndef MOJO_SERVICES_GFX_COMPOSITION_CPP_FORMATTING_H_
 #define MOJO_SERVICES_GFX_COMPOSITION_CPP_FORMATTING_H_
 
-#include "mojo/public/cpp/bindings/formatting.h"
-#include "mojo/services/geometry/cpp/formatting.h"
 #include "apps/compositor/services/interfaces/compositor.mojom.h"
 #include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "mojo/public/cpp/bindings/formatting.h"
+#include "mojo/services/geometry/cpp/formatting.h"
 
 namespace mojo {
 namespace gfx {

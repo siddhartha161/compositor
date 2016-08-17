@@ -5,20 +5,20 @@
 #ifndef SERVICES_GFX_COMPOSITOR_GRAPH_SCENE_DEF_H_
 #define SERVICES_GFX_COMPOSITOR_GRAPH_SCENE_DEF_H_
 
+#include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "mojo/services/gfx/composition/interfaces/scenes.mojom.h"
-#include "services/gfx/compositor/graph/nodes.h"
-#include "services/gfx/compositor/graph/resources.h"
-#include "services/gfx/compositor/graph/scene_content.h"
-#include "services/gfx/compositor/graph/scene_label.h"
+#include "apps/compositor/services/interfaces/scenes.mojom.h"
+#include "apps/compositor/src/graph/nodes.h"
+#include "apps/compositor/src/graph/resources.h"
+#include "apps/compositor/src/graph/scene_content.h"
+#include "apps/compositor/src/graph/scene_label.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 namespace compositor {
 
@@ -27,10 +27,10 @@ class Universe;
 
 // Determines whether a scene is registered.
 using SceneResolver =
-    base::Callback<bool(const mojo::gfx::composition::SceneToken&)>;
+    std::function<bool(const mojo::gfx::composition::SceneToken&)>;
 
 // Sends a scene unavailable message with the specified resource id.
-using SceneUnavailableSender = base::Callback<void(uint32_t)>;
+using SceneUnavailableSender = std::function<void(uint32_t)>;
 
 // Scene definition.
 //
@@ -96,7 +96,7 @@ class SceneDef {
    private:
     const SceneDef* scene_;
 
-    DISALLOW_COPY_AND_ASSIGN(Collector);
+    FTL_DISALLOW_COPY_AND_ASSIGN(Collector);
   };
 
   struct Publication {
@@ -111,7 +111,7 @@ class SceneDef {
     std::vector<mojo::gfx::composition::SceneUpdatePtr> updates;
 
    private:
-    DISALLOW_COPY_AND_ASSIGN(Publication);
+    FTL_DISALLOW_COPY_AND_ASSIGN(Publication);
   };
 
   bool ApplyUpdate(mojo::gfx::composition::SceneUpdatePtr update,
@@ -119,26 +119,25 @@ class SceneDef {
                    const SceneUnavailableSender& unavailable_sender,
                    std::ostream& err);
 
-  scoped_refptr<const Resource> CreateResource(
+  ftl::RefPtr<const Resource> CreateResource(
       uint32_t resource_id,
       mojo::gfx::composition::ResourcePtr resource_decl,
       const SceneResolver& resolver,
       const SceneUnavailableSender& unavailable_sender,
       std::ostream& err);
-  scoped_refptr<const Node> CreateNode(
-      uint32_t node_id,
-      mojo::gfx::composition::NodePtr node_decl,
-      std::ostream& err);
+  ftl::RefPtr<const Node> CreateNode(uint32_t node_id,
+                                     mojo::gfx::composition::NodePtr node_decl,
+                                     std::ostream& err);
 
   const SceneLabel label_;
 
   std::vector<mojo::gfx::composition::SceneUpdatePtr> pending_updates_;
   std::vector<std::unique_ptr<Publication>> pending_publications_;
 
-  std::unordered_map<uint32_t, scoped_refptr<const Resource>> resources_;
-  std::unordered_map<uint32_t, scoped_refptr<const Node>> nodes_;
+  std::unordered_map<uint32_t, ftl::RefPtr<const Resource>> resources_;
+  std::unordered_map<uint32_t, ftl::RefPtr<const Node>> nodes_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneDef);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneDef);
 };
 
 }  // namespace compositor

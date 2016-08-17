@@ -5,15 +5,15 @@
 #ifndef SERVICES_GFX_COMPOSITOR_BACKEND_VSYNC_SCHEDULER_H_
 #define SERVICES_GFX_COMPOSITOR_BACKEND_VSYNC_SCHEDULER_H_
 
+#include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "base/task_runner.h"
-#include "services/gfx/compositor/backend/scheduler.h"
+#include "apps/compositor/src/backend/scheduler.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
+#include "lib/ftl/tasks/task_runner.h"
 
 namespace compositor {
 
@@ -29,11 +29,11 @@ class VsyncScheduler : public Scheduler {
   static constexpr int64_t kMaxVsyncInterval = 1000000;  // 1 Hz
 
   // Time reference.  Should be MojoTimeTicksNow() except during testing.
-  using Clock = base::Callback<MojoTimeTicks()>;
+  using Clock = std::function<MojoTimeTicks()>;
 
-  VsyncScheduler(const scoped_refptr<base::TaskRunner>& task_runner,
+  VsyncScheduler(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
                  const SchedulerCallbacks& callbacks);
-  VsyncScheduler(const scoped_refptr<base::TaskRunner>& task_runner,
+  VsyncScheduler(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
                  const SchedulerCallbacks& callbacks,
                  const Clock& clock);
 
@@ -97,12 +97,12 @@ class VsyncScheduler : public Scheduler {
   // other threads can reference it using a weak_ptr.
   class State : public std::enable_shared_from_this<State> {
    public:
-    State(const scoped_refptr<base::TaskRunner>& task_runner,
+    State(const ftl::RefPtr<ftl::TaskRunner>& task_runner,
           const SchedulerCallbacks& callbacks,
           const Clock& clock);
     ~State();
 
-    MojoTimeTicks GetTimeTicksNow() { return clock_.Run(); }
+    MojoTimeTicks GetTimeTicksNow() { return clock_(); }
 
     bool Start(int64_t vsync_timebase,
                int64_t vsync_interval,
@@ -119,11 +119,6 @@ class VsyncScheduler : public Scheduler {
       kLateSnapshot,
     };
 
-    static void DispatchThunk(const std::weak_ptr<State>& state_weak,
-                              int32_t generation,
-                              Action action,
-                              int64_t update_time);
-
     void ScheduleLocked(MojoTimeTicks now);
     void PostDispatchLocked(int64_t now,
                             int64_t delivery_time,
@@ -134,7 +129,7 @@ class VsyncScheduler : public Scheduler {
     void SetFrameInfoLocked(mojo::gfx::composition::FrameInfo* frame_info,
                             int64_t update_time);
 
-    const scoped_refptr<base::TaskRunner> task_runner_;
+    const ftl::RefPtr<ftl::TaskRunner> task_runner_;
     const SchedulerCallbacks callbacks_;
     const Clock clock_;
 
@@ -153,12 +148,12 @@ class VsyncScheduler : public Scheduler {
     int64_t last_delivered_presentation_time_ =
         std::numeric_limits<int64_t>::min();
 
-    DISALLOW_COPY_AND_ASSIGN(State);
+    FTL_DISALLOW_COPY_AND_ASSIGN(State);
   };
 
   const std::shared_ptr<State> state_;
 
-  DISALLOW_COPY_AND_ASSIGN(VsyncScheduler);
+  FTL_DISALLOW_COPY_AND_ASSIGN(VsyncScheduler);
 };
 
 }  // namespace compositor

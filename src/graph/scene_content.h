@@ -9,13 +9,13 @@
 #include <string>
 #include <unordered_map>
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "mojo/services/gfx/composition/interfaces/hit_tests.mojom.h"
-#include "mojo/services/gfx/composition/interfaces/scenes.mojom.h"
-#include "services/gfx/compositor/graph/nodes.h"
-#include "services/gfx/compositor/graph/resources.h"
-#include "services/gfx/compositor/graph/scene_label.h"
+#include "apps/compositor/services/interfaces/hit_tests.mojom.h"
+#include "apps/compositor/services/interfaces/scenes.mojom.h"
+#include "apps/compositor/src/graph/nodes.h"
+#include "apps/compositor/src/graph/resources.h"
+#include "apps/compositor/src/graph/scene_label.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 class SkCanvas;
 struct SkPoint;
@@ -39,7 +39,7 @@ class SceneContentBuilder;
 // with a vector of internally linked graph edges.  This is relatively easy
 // since the traversal order is well-known and we could even build some kind
 // of hierarchical iterator to walk the graph starting from the root.
-class SceneContent : public base::RefCounted<SceneContent> {
+class SceneContent : public ftl::RefCountedThreadSafe<SceneContent> {
  public:
   // Gets the scene label.
   const SceneLabel& label() const { return label_; }
@@ -84,7 +84,7 @@ class SceneContent : public base::RefCounted<SceneContent> {
   const Node* GetRootNodeIfExists() const;
 
  private:
-  friend class base::RefCounted<SceneContent>;
+  FRIEND_REF_COUNTED_THREAD_SAFE(SceneContent);
   friend class SceneContentBuilder;
   SceneContent(const SceneLabel& label,
                uint32_t version,
@@ -96,10 +96,10 @@ class SceneContent : public base::RefCounted<SceneContent> {
   const SceneLabel label_;
   const uint32_t version_;
   const int64_t presentation_time_;
-  std::unordered_map<uint32_t, scoped_refptr<const Resource>> resources_;
-  std::unordered_map<uint32_t, scoped_refptr<const Node>> nodes_;
+  std::unordered_map<uint32_t, ftl::RefPtr<const Resource>> resources_;
+  std::unordered_map<uint32_t, ftl::RefPtr<const Node>> nodes_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneContent);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneContent);
 };
 
 // Builds a table of all of the nodes and resources that make up the
@@ -129,7 +129,7 @@ class SceneContentBuilder {
 
   // Builds the content graph.
   // Returns nullptr if an error occurred.
-  scoped_refptr<const SceneContent> Build();
+  ftl::RefPtr<const SceneContent> Build();
 
  protected:
   // Finds resources or nodes in the current version, returns nullptr if absent.
@@ -139,10 +139,10 @@ class SceneContentBuilder {
  private:
   bool AddNode(const Node* node);
 
-  scoped_refptr<SceneContent> content_;
+  ftl::RefPtr<SceneContent> content_;
   std::ostream& err_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneContentBuilder);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneContentBuilder);
 };
 
 }  // namespace compositor

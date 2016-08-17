@@ -7,15 +7,15 @@
 
 #include <memory>
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "base/memory/weak_ptr.h"
-#include "base/timer/timer.h"
-#include "mojo/gpu/gl_context.h"
+#include "apps/compositor/glue/gl/gl_context.h"
+#include "apps/compositor/glue/skia/ganesh_context.h"
+#include "apps/compositor/glue/skia/ganesh_framebuffer_surface.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
+#include "lib/ftl/memory/weak_ptr.h"
+#include "lib/ftl/tasks/one_shot_timer.h"
 #include "mojo/public/cpp/bindings/binding.h"
 #include "mojo/services/gpu/interfaces/context_provider.mojom.h"
-#include "mojo/skia/ganesh_context.h"
-#include "mojo/skia/ganesh_framebuffer_surface.h"
 
 namespace compositor {
 
@@ -61,7 +61,7 @@ class GpuRasterizer : public mojo::ViewportParameterListener,
   // Draws the specified frame.
   // Each frame will be acknowledged by a called to |OnRasterizerFinishedDraw|
   // in the order submitted.  The rasterizer must be in a ready state.
-  void DrawFrame(const scoped_refptr<RenderFrame>& frame);
+  void DrawFrame(const ftl::RefPtr<RenderFrame>& frame);
 
  private:
   // |ViewportParameterListener|:
@@ -85,12 +85,12 @@ class GpuRasterizer : public mojo::ViewportParameterListener,
   mojo::ContextProviderPtr context_provider_;
   Callbacks* callbacks_;
 
-  scoped_refptr<mojo::GLContext> gl_context_;
-  scoped_refptr<mojo::skia::GaneshContext> ganesh_context_;
+  ftl::RefPtr<mojo::GLContext> gl_context_;
+  ftl::RefPtr<mojo::skia::GaneshContext> ganesh_context_;
   std::unique_ptr<mojo::skia::GaneshFramebufferSurface> ganesh_surface_;
 
   mojo::Binding<ViewportParameterListener> viewport_parameter_listener_binding_;
-  base::Timer viewport_parameter_timeout_;
+  ftl::OneShotTimer viewport_parameter_timeout_;
   bool have_viewport_parameters_ = false;
   int64_t vsync_timebase_ = 0u;
   int64_t vsync_interval_ = 0u;
@@ -99,9 +99,9 @@ class GpuRasterizer : public mojo::ViewportParameterListener,
   uint32_t total_frames_ = 0u;
   uint32_t frames_in_progress_ = 0u;
 
-  base::WeakPtrFactory<GpuRasterizer> weak_ptr_factory_;
+  ftl::WeakPtrFactory<GpuRasterizer> weak_ptr_factory_;
 
-  DISALLOW_COPY_AND_ASSIGN(GpuRasterizer);
+  FTL_DISALLOW_COPY_AND_ASSIGN(GpuRasterizer);
 };
 
 }  // namespace compositor

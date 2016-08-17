@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/frame_dispatcher.h"
+#include "apps/compositor/src/frame_dispatcher.h"
 
 namespace compositor {
 
@@ -18,7 +18,7 @@ bool FrameDispatcher::AddCallback(const FrameCallback& callback) {
 void FrameDispatcher::DispatchCallbacks(
     const mojo::gfx::composition::FrameInfo& frame_info) {
   for (auto& callback : pending_callbacks_) {
-    callback.Run(frame_info.Clone());
+    callback(frame_info.Clone());
   }
   pending_callbacks_.clear();
 }

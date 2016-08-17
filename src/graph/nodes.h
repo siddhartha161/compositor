@@ -9,10 +9,10 @@
 #include <memory>
 #include <vector>
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "mojo/services/gfx/composition/interfaces/nodes.mojom.h"
-#include "services/gfx/compositor/graph/snapshot.h"
+#include "apps/compositor/services/interfaces/nodes.mojom.h"
+#include "apps/compositor/src/graph/snapshot.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 class SkCanvas;
 struct SkPoint;
@@ -31,7 +31,7 @@ class TransformPair;
 //
 // Instances of this class are immutable and reference counted so they may
 // be shared by multiple versions of the same scene.
-class Node : public base::RefCounted<Node> {
+class Node : public ftl::RefCountedThreadSafe<Node> {
  public:
   using Combinator = mojo::gfx::composition::Node::Combinator;
 
@@ -88,7 +88,7 @@ class Node : public base::RefCounted<Node> {
                mojo::Array<mojo::gfx::composition::HitPtr>* hits) const;
 
  protected:
-  friend class base::RefCounted<Node>;
+  FRIEND_REF_COUNTED_THREAD_SAFE(Node);
   virtual ~Node();
 
   // Applies a unary function to the children selected by the node's
@@ -125,7 +125,7 @@ class Node : public base::RefCounted<Node> {
   Combinator const combinator_;
   std::vector<uint32_t> const child_node_ids_;
 
-  DISALLOW_COPY_AND_ASSIGN(Node);
+  FTL_DISALLOW_COPY_AND_ASSIGN(Node);
 };
 
 // Represents a rectangle node.
@@ -156,7 +156,7 @@ class RectNode : public Node {
   mojo::RectF const content_rect_;
   mojo::gfx::composition::Color const color_;
 
-  DISALLOW_COPY_AND_ASSIGN(RectNode);
+  FTL_DISALLOW_COPY_AND_ASSIGN(RectNode);
 };
 
 // Represents an image node.
@@ -172,7 +172,7 @@ class ImageNode : public Node {
             const std::vector<uint32_t>& child_node_ids,
             const mojo::RectF& content_rect,
             mojo::RectFPtr image_rect,
-            uint32 image_resource_id,
+            uint32_t image_resource_id,
             mojo::gfx::composition::BlendPtr blend);
 
   const mojo::RectF& content_rect() const { return content_rect_; }
@@ -195,7 +195,7 @@ class ImageNode : public Node {
   uint32_t const image_resource_id_;
   mojo::gfx::composition::BlendPtr const blend_;
 
-  DISALLOW_COPY_AND_ASSIGN(ImageNode);
+  FTL_DISALLOW_COPY_AND_ASSIGN(ImageNode);
 };
 
 // Represents a scene node.
@@ -238,7 +238,7 @@ class SceneNode : public Node {
   uint32_t const scene_resource_id_;
   uint32_t const scene_version_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneNode);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneNode);
 };
 
 // Represents a layer node.
@@ -269,7 +269,7 @@ class LayerNode : public Node {
   mojo::RectF const layer_rect_;
   mojo::gfx::composition::BlendPtr const blend_;
 
-  DISALLOW_COPY_AND_ASSIGN(LayerNode);
+  FTL_DISALLOW_COPY_AND_ASSIGN(LayerNode);
 };
 
 }  // namespace compositor

@@ -5,9 +5,9 @@
 #ifndef SERVICES_GFX_COMPOSITOR_RENDER_RENDER_FRAME_H_
 #define SERVICES_GFX_COMPOSITOR_RENDER_RENDER_FRAME_H_
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 #include "third_party/skia/include/core/SkRect.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 
@@ -20,7 +20,7 @@ namespace compositor {
 //
 // Render objects are thread-safe, immutable, and reference counted.
 // They have no direct references to the scene graph.
-class RenderFrame : public base::RefCountedThreadSafe<RenderFrame> {
+class RenderFrame : public ftl::RefCountedThreadSafe<RenderFrame> {
  public:
   // Contains metadata about a particular |RenderFrame| used for tracing
   // and statistics.
@@ -61,7 +61,7 @@ class RenderFrame : public base::RefCountedThreadSafe<RenderFrame> {
   void Draw(SkCanvas* canvas) const;
 
  private:
-  friend class base::RefCountedThreadSafe<RenderFrame>;
+  FRIEND_REF_COUNTED_THREAD_SAFE(RenderFrame);
   friend class RenderFrameBuilder;
 
   ~RenderFrame();
@@ -70,7 +70,7 @@ class RenderFrame : public base::RefCountedThreadSafe<RenderFrame> {
   SkIRect viewport_;
   sk_sp<SkPicture> picture_;
 
-  DISALLOW_COPY_AND_ASSIGN(RenderFrame);
+  FTL_DISALLOW_COPY_AND_ASSIGN(RenderFrame);
 };
 
 }  // namespace compositor

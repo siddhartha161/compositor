@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/compositor_engine.h"
+#include "apps/compositor/src/compositor_engine.h"
 
 #include <algorithm>
 #include <sstream>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/bind_helpers.h"
-#include "base/time/time.h"
-#include "base/trace_event/trace_event.h"
-#include "mojo/services/gfx/composition/cpp/formatting.h"
-#include "mojo/skia/type_converters.h"
-#include "services/gfx/compositor/backend/gpu_output.h"
-#include "services/gfx/compositor/graph/snapshot.h"
-#include "services/gfx/compositor/render/render_frame.h"
-#include "services/gfx/compositor/renderer_impl.h"
-#include "services/gfx/compositor/scene_impl.h"
+#include "apps/compositor/glue/base/logging.h"
+#include "apps/compositor/glue/base/trace_event.h"
+#include "apps/compositor/glue/skia/type_converters.h"
+#include "apps/compositor/services/cpp/formatting.h"
+#include "apps/compositor/src/backend/gpu_output.h"
+#include "apps/compositor/src/graph/snapshot.h"
+#include "apps/compositor/src/render/render_frame.h"
+#include "apps/compositor/src/renderer_impl.h"
+#include "apps/compositor/src/scene_impl.h"
+#include "lib/ftl/functional/closure.h"
+#include "lib/mtl/tasks/message_loop.h"
 
 namespace compositor {
 namespace {
@@ -41,8 +41,8 @@ mojo::gfx::composition::SceneTokenPtr CompositorEngine::CreateScene(
     const mojo::String& label) {
   auto scene_token = mojo::gfx::composition::SceneToken::New();
   scene_token->value = next_scene_token_value_++;
-  CHECK(scene_token->value);
-  CHECK(!FindScene(scene_token->value));
+  FTL_CHECK(scene_token->value);
+  FTL_CHECK(!FindScene(scene_token->value));
 
   // Create the state and bind implementation to it.
   SceneState* scene_state =
@@ -50,9 +50,9 @@ mojo::gfx::composition::SceneTokenPtr CompositorEngine::CreateScene(
   SceneImpl* scene_impl =
       new SceneImpl(this, scene_state, scene_request.Pass());
   scene_state->set_scene_impl(scene_impl);
-  base::Closure error_handler =
-      base::Bind(&CompositorEngine::OnSceneConnectionError,
-                 base::Unretained(this), scene_state);
+  ftl::Closure error_handler = [this, scene_state] {
+    OnSceneConnectionError(scene_state);
+  };
   scene_impl->set_connection_error_handler(error_handler);
 
   // Add to registry.
@@ -63,14 +63,14 @@ mojo::gfx::composition::SceneTokenPtr CompositorEngine::CreateScene(
 }
 
 void CompositorEngine::OnSceneConnectionError(SceneState* scene_state) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "OnSceneConnectionError: scene=" << scene_state;
 
   DestroyScene(scene_state);
 }
 
 void CompositorEngine::DestroyScene(SceneState* scene_state) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "DestroyScene: scene=" << scene_state;
 
   // Notify other scenes which may depend on this one.
@@ -78,9 +78,9 @@ void CompositorEngine::DestroyScene(SceneState* scene_state) {
     SceneState* other_scene_state = pair.second;
     other_scene_state->scene_def()->NotifySceneUnavailable(
         scene_state->scene_token(),
-        base::Bind(&CompositorEngine::SendResourceUnavailable,
-                   base::Unretained(this),
-                   base::Unretained(other_scene_state)));
+        [this, other_scene_state](uint32_t resource_id) {
+          SendResourceUnavailable(other_scene_state, resource_id);
+        });
   }
 
   // Destroy any renderers using this scene.
@@ -91,9 +91,9 @@ void CompositorEngine::DestroyScene(SceneState* scene_state) {
     }
   }
   for (auto& renderer : renderers_to_destroy) {
-    LOG(ERROR) << "Destroying renderer whose root scene has become "
-                  "unavailable: renderer="
-               << renderer;
+    FTL_LOG(ERROR) << "Destroying renderer whose root scene has become "
+                      "unavailable: renderer="
+                   << renderer;
     DestroyRenderer(renderer);
   }
 
@@ -110,9 +110,9 @@ void CompositorEngine::CreateRenderer(
     mojo::InterfaceHandle<mojo::ContextProvider> context_provider,
     mojo::InterfaceRequest<mojo::gfx::composition::Renderer> renderer_request,
     const mojo::String& label) {
-  DCHECK(context_provider);
+  FTL_DCHECK(context_provider);
   uint32_t renderer_id = next_renderer_id_++;
-  CHECK(renderer_id);
+  FTL_CHECK(renderer_id);
 
   // Create the state and bind implementation to it.
   RendererState* renderer_state =
@@ -121,19 +121,32 @@ void CompositorEngine::CreateRenderer(
       new RendererImpl(this, renderer_state, renderer_request.Pass());
   renderer_state->set_renderer_impl(renderer_impl);
   renderer_impl->set_connection_error_handler(
-      base::Bind(&CompositorEngine::OnRendererConnectionError,
-                 base::Unretained(this), renderer_state));
+      [this, renderer_state] { OnRendererConnectionError(renderer_state); });
 
   // Create the renderer.
   SchedulerCallbacks scheduler_callbacks(
-      base::Bind(&CompositorEngine::OnOutputUpdateRequest,
-                 weak_factory_.GetWeakPtr(), renderer_state->GetWeakPtr()),
-      base::Bind(&CompositorEngine::OnOutputSnapshotRequest,
-                 weak_factory_.GetWeakPtr(), renderer_state->GetWeakPtr()));
-  std::unique_ptr<Output> output(new GpuOutput(
-      context_provider.Pass(), scheduler_callbacks,
-      base::Bind(&CompositorEngine::OnOutputError, weak_factory_.GetWeakPtr(),
-                 renderer_state->GetWeakPtr())));
+      [
+        weak = weak_factory_.GetWeakPtr(),
+        renderer_state_weak = renderer_state->GetWeakPtr()
+      ](const mojo::gfx::composition::FrameInfo& frame_info) {
+        if (weak)
+          weak->OnOutputUpdateRequest(renderer_state_weak, frame_info);
+      },
+      [
+        weak = weak_factory_.GetWeakPtr(),
+        renderer_state_weak = renderer_state->GetWeakPtr()
+      ](const mojo::gfx::composition::FrameInfo& frame_info) {
+        if (weak)
+          weak->OnOutputSnapshotRequest(renderer_state_weak, frame_info);
+      });
+  std::unique_ptr<Output> output(
+      new GpuOutput(context_provider.Pass(), scheduler_callbacks, [
+        weak = weak_factory_.GetWeakPtr(),
+        renderer_state_weak = renderer_state->GetWeakPtr()
+      ] {
+        if (weak)
+          weak->OnOutputError(renderer_state_weak);
+      }));
   renderer_state->set_output(std::move(output));
 
   // Add to registry.
@@ -143,14 +156,14 @@ void CompositorEngine::CreateRenderer(
 
 void CompositorEngine::OnRendererConnectionError(
     RendererState* renderer_state) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(1) << "OnRendererConnectionError: renderer=" << renderer_state;
 
   DestroyRenderer(renderer_state);
 }
 
 void CompositorEngine::DestroyRenderer(RendererState* renderer_state) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(1) << "DestroyRenderer: renderer=" << renderer_state;
 
   // Remove from registry.
@@ -162,7 +175,7 @@ void CompositorEngine::DestroyRenderer(RendererState* renderer_state) {
 void CompositorEngine::SetListener(
     SceneState* scene_state,
     mojo::gfx::composition::SceneListenerPtr listener) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "SetSceneListener: scene=" << scene_state;
 
   scene_state->set_scene_listener(listener.Pass());
@@ -170,7 +183,7 @@ void CompositorEngine::SetListener(
 
 void CompositorEngine::Update(SceneState* scene_state,
                               mojo::gfx::composition::SceneUpdatePtr update) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "Update: scene=" << scene_state << ", update=" << update;
 
   scene_state->scene_def()->EnqueueUpdate(update.Pass());
@@ -179,7 +192,7 @@ void CompositorEngine::Update(SceneState* scene_state,
 void CompositorEngine::Publish(
     SceneState* scene_state,
     mojo::gfx::composition::SceneMetadataPtr metadata) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "Publish: scene=" << scene_state << ", metadata=" << metadata;
 
   if (!metadata)
@@ -200,23 +213,27 @@ void CompositorEngine::Publish(
   // might have side-effects on the client's state (such as closing the
   // connection due to an error or releasing resources).
   MojoTimeTicks now = MojoGetTimeTicksNow();
-  DCHECK(now >= 0);
+  FTL_DCHECK(now >= 0);
   if (presentation_time <= now) {
     SceneDef::Disposition disposition = PresentScene(scene_state, now);
     if (disposition == SceneDef::Disposition::kFailed)
       DestroyScene(scene_state);
   } else {
-    base::MessageLoop::current()->PostDelayedTask(
-        FROM_HERE, base::Bind(&CompositorEngine::OnPresentScene,
-                              weak_factory_.GetWeakPtr(),
-                              scene_state->GetWeakPtr(), presentation_time),
-        base::TimeDelta::FromMicroseconds(presentation_time - now));
+    mtl::MessageLoop::GetCurrent()->task_runner()->PostDelayedTask(
+        [
+          weak = weak_factory_.GetWeakPtr(),
+          scene_state_weak = scene_state->GetWeakPtr(), presentation_time
+        ] {
+          if (weak)
+            weak->OnPresentScene(scene_state_weak, presentation_time);
+        },
+        ftl::TimeDelta::FromMicroseconds(presentation_time - now));
   }
 }
 
 void CompositorEngine::ScheduleFrame(SceneState* scene_state,
                                      const FrameCallback& callback) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(1) << "ScheduleFrame: scene=" << scene_state;
 
   if (!scene_state->frame_dispatcher().AddCallback(callback))
@@ -234,18 +251,18 @@ void CompositorEngine::ScheduleFrame(SceneState* scene_state,
 void CompositorEngine::SetRootScene(
     RendererState* renderer_state,
     mojo::gfx::composition::SceneTokenPtr scene_token,
-    uint32 scene_version,
+    uint32_t scene_version,
     mojo::RectPtr viewport) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
-  DCHECK(scene_token);
-  DCHECK(viewport);
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(scene_token);
+  FTL_DCHECK(viewport);
   DVLOG(1) << "SetRootScene: renderer=" << renderer_state
            << ", scene_token=" << scene_token
            << ", scene_version=" << scene_version << ", viewport=" << viewport;
 
   if (viewport->width <= 0 || viewport->width > kMaxViewportWidth ||
       viewport->height <= 0 || viewport->height > kMaxViewportHeight) {
-    LOG(ERROR) << "Invalid viewport size: " << viewport;
+    FTL_LOG(ERROR) << "Invalid viewport size: " << viewport;
     DestroyRenderer(renderer_state);
     return;
   }
@@ -253,9 +270,10 @@ void CompositorEngine::SetRootScene(
   // Find the scene.
   SceneState* scene_state = FindScene(scene_token->value);
   if (!scene_state) {
-    LOG(ERROR) << "Could not set the renderer's root scene, scene not found: "
-                  "scene_token="
-               << scene_token;
+    FTL_LOG(ERROR)
+        << "Could not set the renderer's root scene, scene not found: "
+           "scene_token="
+        << scene_token;
     DestroyRenderer(renderer_state);
     return;
   }
@@ -268,7 +286,7 @@ void CompositorEngine::SetRootScene(
 }
 
 void CompositorEngine::ClearRootScene(RendererState* renderer_state) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(1) << "ClearRootScene: renderer=" << renderer_state;
 
   // Update the root.
@@ -280,7 +298,7 @@ void CompositorEngine::ClearRootScene(RendererState* renderer_state) {
 
 void CompositorEngine::ScheduleFrame(RendererState* renderer_state,
                                      const FrameCallback& callback) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(1) << "ScheduleFrame: renderer=" << renderer_state;
 
   if (!renderer_state->frame_dispatcher().AddCallback(callback))
@@ -294,14 +312,14 @@ void CompositorEngine::HitTest(
     RendererState* renderer_state,
     mojo::PointFPtr point,
     const mojo::gfx::composition::HitTester::HitTestCallback& callback) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
-  DCHECK(point);
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(point);
   DVLOG(1) << "HitTest: renderer=" << renderer_state << ", point=" << point;
 
   auto result = mojo::gfx::composition::HitTestResult::New();
 
   if (renderer_state->visible_snapshot()) {
-    DCHECK(!renderer_state->visible_snapshot()->is_blocked());
+    FTL_DCHECK(!renderer_state->visible_snapshot()->is_blocked());
     renderer_state->visible_snapshot()->HitTest(*point, result.get());
   }
 
@@ -315,13 +333,12 @@ bool CompositorEngine::ResolveSceneReference(
 
 void CompositorEngine::SendResourceUnavailable(SceneState* scene_state,
                                                uint32_t resource_id) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(2) << "SendResourceUnavailable: resource_id=" << resource_id;
 
   // TODO: Detect ANRs
   if (scene_state->scene_listener()) {
-    scene_state->scene_listener()->OnResourceUnavailable(
-        resource_id, base::Bind(&base::DoNothing));
+    scene_state->scene_listener()->OnResourceUnavailable(resource_id, [] {});
   }
 }
 
@@ -331,7 +348,7 @@ SceneState* CompositorEngine::FindScene(uint32_t scene_token) {
 }
 
 void CompositorEngine::InvalidateScene(SceneState* scene_state) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(2) << "InvalidateScene: scene=" << scene_state;
 
   for (auto& renderer : renderers_) {
@@ -346,20 +363,22 @@ void CompositorEngine::InvalidateScene(SceneState* scene_state) {
 SceneDef::Disposition CompositorEngine::PresentScene(
     SceneState* scene_state,
     int64_t presentation_time) {
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
   DVLOG(2) << "PresentScene: scene=" << scene_state;
 
   std::ostringstream errs;
   SceneDef::Disposition disposition = scene_state->scene_def()->Present(
       presentation_time, &universe_,
-      base::Bind(&CompositorEngine::ResolveSceneReference,
-                 base::Unretained(this)),
-      base::Bind(&CompositorEngine::SendResourceUnavailable,
-                 base::Unretained(this), base::Unretained(scene_state)),
+      [this](const mojo::gfx::composition::SceneToken& scene_token) {
+        return ResolveSceneReference(scene_token);
+      },
+      [this, scene_state](uint32_t resource_id) {
+        return SendResourceUnavailable(scene_state, resource_id);
+      },
       errs);
   if (disposition == SceneDef::Disposition::kFailed) {
-    LOG(ERROR) << "Scene published invalid updates: scene=" << scene_state;
-    LOG(ERROR) << errs.str();
+    FTL_LOG(ERROR) << "Scene published invalid updates: scene=" << scene_state;
+    FTL_LOG(ERROR) << errs.str();
     // Caller is responsible for destroying the scene.
   }
   return disposition;
@@ -368,7 +387,7 @@ SceneDef::Disposition CompositorEngine::PresentScene(
 void CompositorEngine::ComposeRenderer(
     RendererState* renderer_state,
     const mojo::gfx::composition::FrameInfo& frame_info) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(2) << "ComposeRenderer: renderer_state=" << renderer_state;
 
   TRACE_EVENT1("gfx", "CompositorEngine::ComposeRenderer", "renderer",
@@ -382,7 +401,7 @@ void CompositorEngine::ComposeRenderer(
 
 void CompositorEngine::PresentRenderer(RendererState* renderer_state,
                                        int64_t presentation_time) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(2) << "PresentRenderer: renderer_state=" << renderer_state;
 
   TRACE_EVENT1("gfx", "CompositorEngine::PresentRenderer", "renderer",
@@ -403,7 +422,7 @@ void CompositorEngine::PresentRenderer(RendererState* renderer_state,
 }
 
 void CompositorEngine::SnapshotRenderer(RendererState* renderer_state) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(2) << "SnapshotRenderer: renderer_state=" << renderer_state;
 
   TRACE_EVENT1("gfx", "CompositorEngine::SnapshotRenderer", "renderer",
@@ -445,7 +464,7 @@ void CompositorEngine::PaintRenderer(
     RendererState* renderer_state,
     const mojo::gfx::composition::FrameInfo& frame_info,
     int64_t composition_time) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   DVLOG(2) << "PaintRenderer: renderer_state=" << renderer_state;
 
   TRACE_EVENT1("gfx", "CompositorEngine::PaintRenderer", "renderer",
@@ -455,7 +474,7 @@ void CompositorEngine::PaintRenderer(
 
   if (renderer_state->visible_snapshot()) {
     // The renderer has snapshotted content; paint and submit it.
-    DCHECK(!renderer_state->visible_snapshot()->is_blocked());
+    FTL_DCHECK(!renderer_state->visible_snapshot()->is_blocked());
     renderer_state->output()->SubmitFrame(
         renderer_state->visible_snapshot()->Paint(
             frame_metadata, renderer_state->root_scene_viewport()));
@@ -464,7 +483,7 @@ void CompositorEngine::PaintRenderer(
     SkIRect viewport = renderer_state->root_scene_viewport().To<SkIRect>();
     if (!viewport.isEmpty()) {
       renderer_state->output()->SubmitFrame(
-          new RenderFrame(frame_metadata, viewport));
+          ftl::MakeRefCounted<RenderFrame>(frame_metadata, viewport));
     }
   }
 }
@@ -472,30 +491,30 @@ void CompositorEngine::PaintRenderer(
 void CompositorEngine::ScheduleFrameForRenderer(
     RendererState* renderer_state,
     Scheduler::SchedulingMode scheduling_mode) {
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
   renderer_state->output()->GetScheduler()->ScheduleFrame(scheduling_mode);
 }
 
 void CompositorEngine::OnOutputError(
-    const base::WeakPtr<RendererState>& renderer_state_weak) {
+    const ftl::WeakPtr<RendererState>& renderer_state_weak) {
   RendererState* renderer_state = renderer_state_weak.get();
   if (!renderer_state)
     return;
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
 
-  LOG(ERROR) << "Renderer encountered a fatal error: renderer="
-             << renderer_state;
+  FTL_LOG(ERROR) << "Renderer encountered a fatal error: renderer="
+                 << renderer_state;
 
   DestroyRenderer(renderer_state);
 }
 
 void CompositorEngine::OnOutputUpdateRequest(
-    const base::WeakPtr<RendererState>& renderer_state_weak,
+    const ftl::WeakPtr<RendererState>& renderer_state_weak,
     const mojo::gfx::composition::FrameInfo& frame_info) {
   RendererState* renderer_state = renderer_state_weak.get();
   if (!renderer_state)
     return;
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
 
   renderer_state->frame_dispatcher().DispatchCallbacks(frame_info);
 
@@ -507,23 +526,23 @@ void CompositorEngine::OnOutputUpdateRequest(
 }
 
 void CompositorEngine::OnOutputSnapshotRequest(
-    const base::WeakPtr<RendererState>& renderer_state_weak,
+    const ftl::WeakPtr<RendererState>& renderer_state_weak,
     const mojo::gfx::composition::FrameInfo& frame_info) {
   RendererState* renderer_state = renderer_state_weak.get();
   if (!renderer_state)
     return;
-  DCHECK(IsRendererStateRegisteredDebug(renderer_state));
+  FTL_DCHECK(IsRendererStateRegisteredDebug(renderer_state));
 
   ComposeRenderer(renderer_state, frame_info);
 }
 
 void CompositorEngine::OnPresentScene(
-    const base::WeakPtr<SceneState>& scene_state_weak,
+    const ftl::WeakPtr<SceneState>& scene_state_weak,
     int64_t presentation_time) {
   SceneState* scene_state = scene_state_weak.get();
   if (!scene_state)
     return;
-  DCHECK(IsSceneStateRegisteredDebug(scene_state));
+  FTL_DCHECK(IsSceneStateRegisteredDebug(scene_state));
 
   SceneDef::Disposition disposition =
       PresentScene(scene_state, presentation_time);

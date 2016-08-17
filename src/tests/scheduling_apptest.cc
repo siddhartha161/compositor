@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "apps/compositor/services/interfaces/compositor.mojom-sync.h"
+#include "apps/compositor/services/interfaces/scheduling.mojom-sync.h"
 #include "mojo/public/cpp/application/application_test_base.h"
 #include "mojo/public/cpp/application/connect.h"
 #include "mojo/public/cpp/bindings/synchronous_interface_ptr.h"
 #include "mojo/public/cpp/system/macros.h"
-#include "mojo/services/gfx/composition/interfaces/compositor.mojom-sync.h"
-#include "mojo/services/gfx/composition/interfaces/scheduling.mojom-sync.h"
 #include "mojo/services/gpu/interfaces/context_provider.mojom.h"
 #include "mojo/services/native_viewport/interfaces/native_viewport.mojom.h"
 
@@ -74,7 +74,7 @@ class SchedulingTest : public mojo::test::ApplicationTestBase {
   mojo::gfx::composition::RendererPtr renderer_;
 
  private:
-  MOJO_DISALLOW_COPY_AND_ASSIGN(SchedulingTest);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SchedulingTest);
 };
 
 namespace {

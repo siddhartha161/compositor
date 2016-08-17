@@ -8,10 +8,10 @@
 #include <deque>
 #include <iosfwd>
 
-#include "base/macros.h"
-#include "base/memory/ref_counted.h"
-#include "services/gfx/compositor/graph/scene_label.h"
-#include "services/gfx/compositor/graph/snapshot.h"
+#include "apps/compositor/src/graph/scene_label.h"
+#include "apps/compositor/src/graph/snapshot.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/ref_counted.h"
 
 namespace compositor {
 
@@ -51,10 +51,10 @@ class Universe {
   ~Universe();
 
   void AddScene(const SceneLabel& scene_label);
-  void PresentScene(const scoped_refptr<const SceneContent>& content);
+  void PresentScene(const ftl::RefPtr<const SceneContent>& content);
   void RemoveScene(const mojo::gfx::composition::SceneToken& scene_token);
 
-  scoped_refptr<const Snapshot> SnapshotScene(
+  ftl::RefPtr<const Snapshot> SnapshotScene(
       const mojo::gfx::composition::SceneToken& scene_token,
       uint32_t version,
       std::ostream* block_log);
@@ -71,7 +71,7 @@ class Universe {
     // scenes based on their dependencies.
     uint64_t update_generation = 0u;
     Snapshot::Disposition disposition = Snapshot::Disposition::kBlocked;
-    std::deque<scoped_refptr<const SceneContent>> content_queue;
+    std::deque<ftl::RefPtr<const SceneContent>> content_queue;
   };
 
   class Snapshotter : public SnapshotBuilder {
@@ -83,19 +83,19 @@ class Universe {
     Snapshot::Disposition ResolveAndSnapshotScene(
         const mojo::gfx::composition::SceneToken& scene_token,
         uint32_t version,
-        scoped_refptr<const SceneContent>* out_content) override;
+        ftl::RefPtr<const SceneContent>* out_content) override;
 
    private:
     Universe* universe_;
     SceneInfo* cycle_ = nullptr;
 
-    DISALLOW_COPY_AND_ASSIGN(Snapshotter);
+    FTL_DISALLOW_COPY_AND_ASSIGN(Snapshotter);
   };
 
   std::unordered_map<uint32_t, std::unique_ptr<SceneInfo>> scenes_;
   uint64_t generation_ = 0u;
 
-  DISALLOW_COPY_AND_ASSIGN(Universe);
+  FTL_DISALLOW_COPY_AND_ASSIGN(Universe);
 };
 
 }  // namespace compositor

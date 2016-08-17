@@ -9,13 +9,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "base/callback.h"
-#include "base/macros.h"
-#include "base/memory/weak_ptr.h"
-#include "mojo/services/gfx/composition/cpp/formatting.h"
-#include "mojo/services/gfx/composition/interfaces/scenes.mojom.h"
-#include "services/gfx/compositor/frame_dispatcher.h"
-#include "services/gfx/compositor/graph/scene_def.h"
+#include "apps/compositor/services/cpp/formatting.h"
+#include "apps/compositor/services/interfaces/scenes.mojom.h"
+#include "apps/compositor/src/frame_dispatcher.h"
+#include "apps/compositor/src/graph/scene_def.h"
+#include "lib/ftl/macros.h"
+#include "lib/ftl/memory/weak_ptr.h"
 
 namespace compositor {
 
@@ -27,7 +26,7 @@ class SceneState {
              const std::string& label);
   ~SceneState();
 
-  base::WeakPtr<SceneState> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
+  ftl::WeakPtr<SceneState> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
   // Gets the token used to refer to this scene globally.
   // Caller does not obtain ownership of the token.
@@ -63,9 +62,9 @@ class SceneState {
 
   SceneDef scene_def_;
 
-  base::WeakPtrFactory<SceneState> weak_factory_;
+  ftl::WeakPtrFactory<SceneState> weak_factory_;
 
-  DISALLOW_COPY_AND_ASSIGN(SceneState);
+  FTL_DISALLOW_COPY_AND_ASSIGN(SceneState);
 };
 
 std::ostream& operator<<(std::ostream& os, SceneState* scene_state);

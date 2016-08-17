@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//mojo/public/mojo_application.gni")
-import("//testing/test.gni")
-
 source_set("common") {
   sources = [
     "backend/gpu_output.cc",
@@ -55,25 +52,29 @@ source_set("common") {
   ]
 
   public_deps = [
-    "//base",
-    "//mojo/application",
-    "//mojo/common:tracing_impl",
-    "//mojo/converters/geometry",
-    "//mojo/gpu",
-    "//mojo/public/c/gpu",
+    "//apps/compositor/glue/base",
+    "//apps/compositor/glue/gl",
+    "//apps/compositor/glue/skia",
+    "//lib/ftl",
+    "//lib/mtl",
+    "//mojo/public/c:GLES2",
+    "//mojo/public/c:MGL",
+    "//mojo/public/cpp/application",
     "//mojo/public/cpp/bindings:bindings",
     "//mojo/services/geometry/cpp",
     "//mojo/services/geometry/interfaces",
-    "//mojo/services/gfx/composition/cpp",
-    "//mojo/services/gfx/composition/interfaces",
+    "//apps/compositor/services/cpp",
+    "//apps/compositor/services/interfaces",
     "//mojo/services/gpu/interfaces",
-    "//mojo/skia",
-    "//skia",
+    "//mojo/system",
+    "//third_party/skia",
   ]
 }
 
-mojo_native_application("compositor") {
-  output_name = "compositor_service"
+# TODO(jeffbrown): Change back to executable once GL thunks are available
+# or after refactoring so we don't need them.
+source_set("compositor") {
+  output_name = "compositor"
 
   sources = [
     "main.cc",
@@ -81,26 +82,25 @@ mojo_native_application("compositor") {
 
   deps = [
     ":common",
-    "//mojo/environment:chromium",
   ]
 }
 
-mojo_native_application("apptests") {
-  output_name = "compositor_apptests"
-
-  testonly = true
-
-  sources = [
-    "backend/vsync_scheduler_unittest.cc",
-    "tests/scheduling_apptest.cc",
-  ]
-
-  deps = [
-    ":common",
-    "//base/test:test_support",
-    "//mojo/application:test_support",
-    "//mojo/services/gfx/composition/interfaces:interfaces_sync",
-    "//mojo/services/native_viewport/interfaces",
-    "//testing/gtest",
-  ]
-}
+# TODO(jeffbrown): Reenable these tests once their dependencies are available.
+# executable("apptests") {
+#   output_name = "compositor_apptests"
+#
+#   testonly = true
+#
+#   sources = [
+#     "backend/vsync_scheduler_unittest.cc",
+#     "tests/scheduling_apptest.cc",
+#   ]
+#
+#   deps = [
+#     ":common",
+#     "//apps/compositor/services/interfaces:interfaces_sync",
+#     "//mojo/public/cpp/application:test_support",
+#     "//mojo/services/native_viewport/interfaces",
+#     "//third_party/gtest",
+#   ]
+# }

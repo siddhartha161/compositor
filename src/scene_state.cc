@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "services/gfx/compositor/scene_state.h"
+#include "apps/compositor/src/scene_state.h"
 
 namespace compositor {
 
@@ -11,7 +11,7 @@ SceneState::SceneState(mojo::gfx::composition::SceneTokenPtr scene_token,
     : scene_token_(scene_token.Pass()),
       scene_def_(SceneLabel(scene_token_->value, label)),
       weak_factory_(this) {
-  DCHECK(scene_token_);
+  FTL_DCHECK(scene_token_);
 }
 
 SceneState::~SceneState() {}
